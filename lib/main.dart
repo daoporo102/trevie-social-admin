@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:social_media_admin/router/app_router.dart';
+import 'package:social_media_admin/utils/colors.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -27,19 +29,14 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Trang quản trị mạng xã hội TreVie',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: appPrimaryColor),
+        useMaterial3: true
       ),
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Trang quản trị mạng xã hội TreVie'),
-        ),
-        body: const Center(
-          child: Text('Chào mừng đến với trang quản trị!'),
-        ),
-      ),
+      routerConfig: router,
     );
   }
 }

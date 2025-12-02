@@ -5,12 +5,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:social_media_admin/models/comment.dart';
 import 'package:social_media_admin/models/post.dart';
 import 'package:social_media_admin/resources/storage_methods.dart';
+import 'package:social_media_admin/services/network_service.dart';
 import 'package:social_media_admin/utils/utils.dart';
 import 'package:uuid/uuid.dart';
 
 class FirestoreMethod {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final userUid = FirebaseAuth.instance.currentUser?.uid;
+  final NetworkService _networkService = NetworkService();
+
+  // Check network connectivity
+  Future<bool> _checkNetwork() async {
+    return await _networkService.checkConnectivity();
+  }
 
   //upload post
   Future<String> uploadPost(
@@ -22,6 +29,12 @@ class FirestoreMethod {
   ) async {
     // asking uid here because we dont want to make extra calls to firebase auth when we can just get from our state management
     String res = "Một lỗi đã xảy ra";
+
+    // Check network connectivity
+    if (!await _checkNetwork()) {
+      return "Không có kết nối Internet";
+    }
+    
     try {
       // Validate proImage before proceeding
       if (profImage.isEmpty) {
