@@ -22,7 +22,7 @@ class AuthMethods {
         following: [],
         bio: '',
         dateOfBirth: DateTime.now(),
-        datePublished: DateTime.now(),
+        createdAt: DateTime.now(),
       );
     }
 
@@ -40,7 +40,7 @@ class AuthMethods {
         following: [],
         bio: '',
         dateOfBirth: DateTime.now(),
-        datePublished: DateTime.now(),
+        createdAt: DateTime.now(),
       );
     }
     return model.User.fromSnap(snap);
@@ -81,7 +81,7 @@ class AuthMethods {
           following: [],
           bio: '',
           dateOfBirth: DateTime.now(),
-          datePublished: DateTime.now(),
+          createdAt: DateTime.now(),
         );
 
         //adding user in our database
