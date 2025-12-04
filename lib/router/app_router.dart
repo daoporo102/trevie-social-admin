@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:social_media_admin/screens/comments/comments_list_screen.dart';
 import 'package:social_media_admin/screens/dashboard_screen.dart';
 import 'package:social_media_admin/screens/login_screen.dart';
+import 'package:social_media_admin/screens/logout_screen.dart';
 import 'package:social_media_admin/screens/posts/posts_list_screen.dart';
 import 'package:social_media_admin/screens/users/users_list_screen.dart';
 import 'package:social_media_admin/services/admin_auth_service.dart';
@@ -74,6 +75,10 @@ final router = GoRouter(
         ),
       ],
     ),
+    GoRoute(
+      path:'/logout',
+      builder: (context,state)=> const LogoutScreen(),
+    )
   ],
 );
 
