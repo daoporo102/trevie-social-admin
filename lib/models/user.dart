@@ -7,7 +7,7 @@ class User {
   final String photoUrl;
   final String? bio;
   final DateTime? dateOfBirth;
-  final DateTime datePublished;
+  final DateTime createdAt;
   final List followers;
   final List following;
 
@@ -20,7 +20,7 @@ class User {
     this.dateOfBirth,
     required this.followers,
     required this.following,
-    required this.datePublished,
+    required this.createdAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -29,7 +29,7 @@ class User {
     "email": email,
     "bio": bio,
     "dateOfBirth": dateOfBirth?.toIso8601String(),
-    "datePublished": Timestamp.fromDate(datePublished),
+    "createdAt": Timestamp.fromDate(createdAt),
     "photoUrl": photoUrl,
     "followers": followers,
     "following": following,
@@ -63,7 +63,7 @@ class User {
           : [],
       bio: snapshotData.containsKey("bio") ? snapshotData["bio"] : '',
       dateOfBirth: parseDateField(snapshotData["dateOfBirth"]),
-      datePublished: parseDateField(snapshotData['datePublished']) ?? DateTime.now(),
+      createdAt: parseDateField(snapshotData['createdAt']) ?? DateTime.now(),
     );
   }
 }
