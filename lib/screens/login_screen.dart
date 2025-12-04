@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:social_media_admin/services/admin_auth_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:social_media_admin/services/network_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/utils.dart';
@@ -18,6 +20,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _adminAuthService = AdminAuthService();
   final _networkService = NetworkService();
   bool _isLoading = false;
 
@@ -42,22 +45,37 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
     try {
-      // TODO: Implement your login logic here
-      // Example:
-      // final result = await AuthMethods().loginUser(
-      //   email: _emailController.text.trim(),
-      //   password: _passwordController.text.trim(),
-      // );
+      final result = await _adminAuthService.adminLogin(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-      // Navigate to the dashboard or home screen upon successful login
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
+
+      if (result == 'success') {
+        // Show success message
+        displaySnackBar('Đăng nhập thành công', context, SnackBarType.success);
+
+        // Use GoRouter to navigate
+        context.go('/dashboard');
+      } else {
+        // Show error message
+        displaySnackBar(result, context, SnackBarType.error);
+      }
     } catch (e) {
-      // Handle login error (e.g., show a snackbar)
+      if (!mounted) return;
+      displaySnackBar(
+        'Đã xảy ra lỗi, vui lòng thử lại sau.: $e',
+        context,
+        SnackBarType.error,
+      );
+      avoidPrint('Login error: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

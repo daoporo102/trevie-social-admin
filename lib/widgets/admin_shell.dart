@@ -95,10 +95,10 @@ class _AdminShellState extends State<AdminShell> {
     return Scaffold(
       body: Row(
         children: [
-          // Collapsible Sidebar
+          // Collapsible Sidebar - INCREASED from 70 to 80px
           _buildSidebar(
             isCollapsible: true,
-            width: _isSidebarCollapsed ? 70 : 200,
+            width: _isSidebarCollapsed ? 80 : 200,
           ),
           // Main Content
           Expanded(
@@ -111,7 +111,11 @@ class _AdminShellState extends State<AdminShell> {
 
   // Sidebar Widget
   Widget _buildSidebar({required bool isCollapsible, required double width}) {
+    final isActuallyCollapsed = isCollapsible && _isSidebarCollapsed;
+
     return AnimatedContainer(
+      // Add key to force rebuild when collapse state changes
+      key: ValueKey(isActuallyCollapsed),
       duration: const Duration(milliseconds: 300),
       width: width,
       color: webBackgroundColor,
@@ -121,43 +125,42 @@ class _AdminShellState extends State<AdminShell> {
           Container(
             height: 80,
             padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (!isCollapsible || !_isSidebarCollapsed)
-                  Expanded(
-                    child:
-                        // Text(
-                        //   'Quản Trị TreVie',
-                        //   style: TextStyle(
-                        //     color: onPrimaryColor,
-                        //     fontSize: 20,
-                        //     fontWeight: FontWeight.bold,
-                        //   ),
-                        //   overflow: TextOverflow.ellipsis,
-                        // ),
-                        SvgPicture.asset(
+            child: isActuallyCollapsed
+                ? Center(
+                    child: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _isSidebarCollapsed = false;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.menu_open_outlined,
+                        color: appPrimaryColor,
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: SvgPicture.asset(
                           'assets/images/trevie.svg',
                           height: 64,
                         ),
+                      ),
+                      if (isCollapsible)
+                        IconButton(
+                          icon: Icon(Icons.menu, color: appPrimaryColor),
+                          onPressed: () {
+                            setState(() {
+                              _isSidebarCollapsed = true;
+                            });
+                          },
+                        ),
+                    ],
                   ),
-                if (isCollapsible)
-                  IconButton(
-                    icon: Icon(
-                      _isSidebarCollapsed ? Icons.menu_open : Icons.menu,
-                      color: appPrimaryColor,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isSidebarCollapsed = !_isSidebarCollapsed;
-                      });
-                    },
-                  ),
-              ],
-            ),
           ),
           Divider(color: secondaryColor, height: 1),
-          // Sidebar content goes here
           Expanded(
             child: ListView(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -166,49 +169,47 @@ class _AdminShellState extends State<AdminShell> {
                   icon: Icons.dashboard,
                   title: 'Bảng Điều Khiển',
                   route: '/dashboard',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
                   icon: Icons.people,
                   title: 'Người Dùng',
                   route: '/users',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
                   icon: Icons.article_outlined,
                   title: 'Bài Viết',
                   route: '/posts',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
                   icon: Icons.comment,
                   title: 'Bình luận',
                   route: '/comments',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
                   icon: Icons.report,
                   title: 'Báo Cáo',
                   route: '/reports',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
                   icon: Icons.settings,
                   title: 'Cài đặt',
                   route: '/settings',
-                  isCollapsed: isCollapsible && _isSidebarCollapsed,
+                  isCollapsed: isActuallyCollapsed,
                 ),
               ],
             ),
           ),
-
-          // Logout Button
           Divider(color: secondaryColor, height: 1),
           _buildMenuItem(
             icon: Icons.logout,
             title: 'Đăng Xuất',
             route: '/logout',
-            isCollapsed: isCollapsible && _isSidebarCollapsed,
+            isCollapsed: isActuallyCollapsed,
             isLogout: true,
           ),
         ],
@@ -235,14 +236,25 @@ class _AdminShellState extends State<AdminShell> {
           color: isSelected ? appPrimaryColor : null,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: ListTile(
-          leading: Icon(
-            icon,
-            color: isSelected ? onPrimaryColor : secondaryColor,
-          ),
-          title: isCollapsed
-              ? null
-              : Text(
+        child: isCollapsed
+            ? InkWell(
+                onTap: () => context.go(route),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 56,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    color: isSelected ? onPrimaryColor : secondaryColor,
+                  ),
+                ),
+              )
+            : ListTile(
+                leading: Icon(
+                  icon,
+                  color: isSelected ? onPrimaryColor : secondaryColor,
+                ),
+                title: Text(
                   title,
                   style: TextStyle(
                     color: isSelected ? onPrimaryColor : secondaryColor,
@@ -251,15 +263,8 @@ class _AdminShellState extends State<AdminShell> {
                         : FontWeight.normal,
                   ),
                 ),
-          onTap: () {
-            if (isLogout) {
-              // Add logout logic here
-              context.go(route);
-            } else {
-              context.go(route);
-            }
-          },
-        ),
+                onTap: () => context.go(route),
+              ),
       ),
     );
   }
