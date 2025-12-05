@@ -102,7 +102,7 @@ class DashboardService {
       QuerySnapshot snapshot = await _firestore
           .collection('users')
           .where(
-            'datePublished',
+            'createdAt',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startOfPeriod),
           )
           .get();
@@ -122,8 +122,8 @@ class DashboardService {
       // Count users per day
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        if (data['datePublished'] != null) {
-          final timestamp = data['datePublished'] as Timestamp;
+        if (data['createdAt'] != null) {
+          final timestamp = data['createdAt'] as Timestamp;
           final date = timestamp.toDate();
           final dayKey = DateTime(date.year, date.month, date.day);
 
