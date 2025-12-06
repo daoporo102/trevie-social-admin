@@ -27,6 +27,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
   bool _isLoading = false;
   bool _isLoadingMore = false;
   int _totalUsers = 0;
+  int _totalDeletedUsers = 0;
 
   // Filters
   UserStatus _selectedStatus = UserStatus.all;
@@ -41,6 +42,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
     super.initState();
     _loadUsers();
     _loadTotalCount();
+    _loadTotalDeletedUsersCount();
   }
 
   @override
@@ -131,6 +133,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
     }
   }
 
+  Future<void> _loadTotalDeletedUsersCount() async {
+    final count = await _userService.getTotalDeletedUsersCount();
+    if (mounted) {
+      setState(() {
+        _totalDeletedUsers = count;
+      });
+    }
+  }
+
   void _applyFilters() {
     _loadUsers(refresh: true);
   }
@@ -205,6 +216,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       displaySnackBar('Đã xóa người dùng', context, SnackBarType.success);
       _loadUsers(refresh: true);
       _loadTotalCount();
+      _loadTotalDeletedUsersCount();
     } else {
       displaySnackBar(result, context, SnackBarType.error);
     }
@@ -220,6 +232,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       displaySnackBar('Đã khôi phục người dùng', context, SnackBarType.success);
       _loadUsers(refresh: true);
       _loadTotalCount();
+      _loadTotalDeletedUsersCount();
     } else {
       displaySnackBar(result, context, SnackBarType.error);
     }
@@ -266,6 +279,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       );
       _loadUsers(refresh: true);
       _loadTotalCount();
+      _loadTotalDeletedUsersCount();
     } else {
       displaySnackBar(result, context, SnackBarType.error);
     }
@@ -278,7 +292,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       appBar: AppBar(
         title: Text(
           _showDeletedUsers
-              ? 'Thùng rác ($_totalUsers)'
+              ? 'Thùng rác ($_totalDeletedUsers)'
               : 'Quản lí người dùng ($_totalUsers)',
         ),
         backgroundColor: webBackgroundColor,
@@ -616,15 +630,23 @@ class _UsersListScreenState extends State<UsersListScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
             decoration: BoxDecoration(
-              color: user.isDeleted ? secondaryColor : user.isSuspended
+              color: user.isDeleted
+                  ? secondaryColor
+                  : user.isSuspended
                   ? errorBackgroundColor.withValues(alpha: 0.1)
                   : appPrimaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              user.isDeleted ? 'Đã bị xóa' : user.isSuspended ? 'Đã bị đình chỉ' : 'Đang hoạt động',
+              user.isDeleted
+                  ? 'Đã bị xóa'
+                  : user.isSuspended
+                  ? 'Đã bị đình chỉ'
+                  : 'Đang hoạt động',
               style: TextStyle(
-                color: user.isDeleted ? secondaryColor : user.isSuspended
+                color: user.isDeleted
+                    ? secondaryColor
+                    : user.isSuspended
                     ? errorBackgroundColor
                     : appPrimaryColor,
                 fontSize: 12,
