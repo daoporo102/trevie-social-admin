@@ -120,6 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         textInputType: TextInputType.emailAddress,
                         prefixIcon: Icons.email_outlined,
                         labelText: 'Địa chỉ Email',
+                        isLoading: !_isLoading,
                       ),
                       const SizedBox(height: 24),
                       //text field input for password
@@ -130,6 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         isPass: true,
                         prefixIcon: Icons.lock_outline,
                         labelText: 'Mật khẩu',
+                        isLoading: !_isLoading,
                       ),
                       const SizedBox(height: 24),
                       CustomInkwell(
