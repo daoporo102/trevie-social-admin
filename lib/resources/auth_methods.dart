@@ -21,8 +21,11 @@ class AuthMethods {
         followers: [],
         following: [],
         bio: '',
-        dateOfBirth: DateTime.now(),
+        dateOfBirth: null,
         createdAt: DateTime.now(),
+        isSuspended: false,
+        suspendedAt: null,
+        isDeleted: false,
       );
     }
 
@@ -39,8 +42,11 @@ class AuthMethods {
         followers: [],
         following: [],
         bio: '',
-        dateOfBirth: DateTime.now(),
+        dateOfBirth: null,
         createdAt: DateTime.now(),
+        isSuspended: false,
+        suspendedAt: null,
+        isDeleted: false,
       );
     }
     return model.User.fromSnap(snap);
@@ -80,8 +86,11 @@ class AuthMethods {
           followers: [],
           following: [],
           bio: '',
-          dateOfBirth: DateTime.now(),
+          dateOfBirth: null,
           createdAt: DateTime.now(),
+          isSuspended: false,
+          suspendedAt: null,
+          isDeleted: false,
         );
 
         //adding user in our database
