@@ -111,6 +111,20 @@ class UserService {
     }
   }
 
+  // Get total deleted users count
+  Future<int> getTotalDeletedUsersCount() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .where('isDeleted', isEqualTo: true)
+          .get();
+      return snapshot.size;
+    } catch (e) {
+      avoidPrint('Error getting total deleted users count: $e');
+      return 0;
+    }
+  }
+
   // Toggle user suspension status
   Future<String> toggleUserSuspension(String userId, bool isSuspended) async {
     try {
