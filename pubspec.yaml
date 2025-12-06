@@ -14,6 +14,7 @@ dependencies:
   cloud_functions: ^6.0.4
   connectivity_plus: ^7.0.0
   cupertino_icons: ^1.0.8
+  data_table_2: ^2.7.2
   firebase_app_check: ^0.4.1+2
   firebase_auth: ^6.1.2
   firebase_auth_mocks: ^0.15.1
