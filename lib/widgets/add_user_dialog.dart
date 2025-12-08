@@ -154,7 +154,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
     });
 
     try {
-      final user = await _userService.createUser(
+      final user = await _userService.createUserforSuperAdmin(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         displayName: _displayNameController.text.trim(),
