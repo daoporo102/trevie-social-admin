@@ -4,6 +4,7 @@ import 'package:social_media_admin/services/admin_management_service.dart';
 import 'package:social_media_admin/services/dashboard_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
+import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/line_chart_widget.dart';
 import 'package:social_media_admin/widgets/stat_card.dart';
 
@@ -49,34 +50,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (user != null && user.email != null) {
       try {
-        print("Đang chuẩn bị kiểm tra quyền...");
-
-        // --- BƯỚC QUAN TRỌNG NHẤT (THÊM DÒNG NÀY) ---
-        // Buộc lấy token mới để đảm bảo SDK đã sẵn sàng
-        // Việc này giúp đồng bộ Auth State trước khi gọi Function
+        avoidPrint("Đang chuẩn bị kiểm tra quyền...");
+        
+        // Refresh token to ensure latest claims
         String? token = await user.getIdToken(true);
-        print("Token đã sẵn sàng, bắt đầu gọi Function...");
+        avoidPrint("Token đã sẵn sàng, bắt đầu gọi Function...");
         // ---------------------------------------------
 
         final status = await _adminService.checkAdminStatus(user.email!);
 
-        print("Kết quả check: $status");
+        avoidPrint("Kết quả check: $status");
 
         if (status['isAdmin'] == true) {
           // Nếu là admin, lại refresh lần nữa để đảm bảo các request sau này (như tạo user) ok
           await user.getIdToken(true);
-          print("Đã đồng bộ quyền Admin thành công!");
+          avoidPrint("Đã đồng bộ quyền Admin thành công!");
           setState(() {
             // Cập nhật UI nếu cần
           });
         } else {
-          print("Tài khoản này không có quyền truy cập Dashboard");
+          avoidPrint("Tài khoản này không có quyền truy cập Dashboard");
         }
       } catch (e) {
-        print("Lỗi khi verify admin: $e");
+        avoidPrint("Lỗi khi verify admin: $e");
       }
     } else {
-      print("User chưa đăng nhập (User is null)");
+      avoidPrint("User chưa đăng nhập (User is null)");
     }
   }
 
