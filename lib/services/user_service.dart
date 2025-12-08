@@ -12,7 +12,9 @@ enum UserSortField { displayName, createdAt, followers }
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'asia-southeast1',
+  );
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Get paginated users list
@@ -460,7 +462,7 @@ class UserService {
   }
 
   // Create a new user (for Super Admins)
-  Future<model.User?> createUser({
+  Future<model.User?> createUserforSuperAdmin({
     required String email,
     required String password,
     required String displayName,
@@ -468,62 +470,68 @@ class UserService {
     DateTime? dateOfBirth,
     required Uint8List image,
   }) async {
+    String? uploadedPhotoUrl;
+
     try {
-      // Force refresh token before making the call
+      // Force refresh token
       final user = _auth.currentUser;
       if (user != null) {
         await user.getIdToken(true);
-        avoidPrint('Token refreshed before creating user');
       }
 
-      // First upload the profile image
-      final photoUrl = await StorageMethods().uploadImageToStorage(
+      // Upload ảnh
+      uploadedPhotoUrl = await StorageMethods().uploadImageToStorage(
         'profilePics',
         image,
         false,
       );
 
-      if (photoUrl.isEmpty) {
+      if (uploadedPhotoUrl.isEmpty) {
         throw Exception('Không thể tải ảnh lên');
       }
 
-      // Call Cloud Function to create user
-      final callable = _functions.httpsCallable('createUser');
-      final result = await callable.call({
+      // --- SỬA LỖI 2: LÀM SẠCH DATA (Xóa null) ---
+      // Tạo một map dữ liệu tạm thời
+      final Map<String, dynamic> payload = {
         'email': email,
         'password': password,
         'displayName': displayName,
-        'bio': bio,
-        'dateOfBirth': dateOfBirth?.toIso8601String(),
-        'photoUrl': photoUrl,
-      });
+        'photoUrl': uploadedPhotoUrl,
+        'bio': bio, // Có thể null
+        'dateOfBirth': dateOfBirth?.toIso8601String(), // Có thể null
+      };
+
+      // Lệnh này sẽ xóa tất cả các dòng có giá trị null
+      // Giúp tránh lỗi "Invalid request" từ Server
+      payload.removeWhere((key, value) => value == null);
+
+      // Gọi Cloud Function với payload đã làm sạch
+      final callable = _functions.httpsCallable('createUser');
+      final result = await callable.call(payload);
+      // ---------------------------------------------
 
       if (result.data['success'] == true) {
-        final userData = result.data['user'] as Map<String, dynamic>;
-        
-        // Convert Firestore timestamps back to DateTime
-        if (userData['createdAt'] != null) {
-          final timestamp = userData['createdAt'] as Timestamp;
-          userData['createdAt'] = timestamp;
-        }
-        if (userData['dateOfBirth'] != null) {
-          final timestamp = userData['dateOfBirth'] as Timestamp;
-          userData['dateOfBirth'] = timestamp;
+        final userData = Map<String, dynamic>.from(result.data['user']);
+
+        DateTime? parseTimestamp(dynamic val) {
+          if (val == null) return null;
+          if (val is Timestamp) return val.toDate();
+          if (val is String) return DateTime.tryParse(val);
+          return null;
         }
 
-        // Create User object from the returned data
         final user = model.User(
           uid: userData['uid'],
           displayName: userData['displayName'],
           email: userData['email'],
           photoUrl: userData['photoUrl'],
           bio: userData['bio'],
-          dateOfBirth: userData['dateOfBirth']?.toDate(),
-          createdAt: userData['createdAt']?.toDate() ?? DateTime.now(),
+          dateOfBirth: parseTimestamp(userData['dateOfBirth']),
+          createdAt: parseTimestamp(userData['createdAt']) ?? DateTime.now(),
           followers: List.from(userData['followers'] ?? []),
           following: List.from(userData['following'] ?? []),
           isSuspended: userData['isSuspended'] ?? false,
-          suspendedAt: userData['suspendedAt']?.toDate(),
+          suspendedAt: parseTimestamp(userData['suspendedAt']),
           isDeleted: userData['isDeleted'] ?? false,
         );
 
@@ -532,35 +540,29 @@ class UserService {
         throw Exception(result.data['message'] ?? 'Không thể tạo người dùng');
       }
     } on FirebaseFunctionsException catch (e) {
-      avoidPrint('Functions error: ${e.code} - ${e.message}');
-      
+      String message = 'Đã xảy ra lỗi';
       switch (e.code) {
         case 'permission-denied':
-          throw Exception('Bạn không có quyền tạo người dùng');
+          message =
+              'Bạn không có quyền tạo người dùng (Token hết hạn hoặc không phải SuperAdmin)';
+          break;
         case 'already-exists':
-          throw Exception('Email đã được sử dụng');
+          message = 'Email đã được sử dụng';
+          break;
         case 'invalid-argument':
-          throw Exception(e.message ?? 'Thông tin không hợp lệ');
+          message = e.message ?? 'Thông tin không hợp lệ';
+          break;
         default:
-          throw Exception(e.message ?? 'Đã xảy ra lỗi');
+          message = e.message ?? 'Lỗi hệ thống: ${e.code}';
       }
+      throw Exception(message);
     } catch (e) {
-      avoidPrint('Error creating user: $e');
-      
-      // If there was an error after uploading the image, try to clean it up
-      try {
-        final photoUrl = await StorageMethods().uploadImageToStorage(
-          'profilePics',
-          image,
-          false,
-        );
-        if (photoUrl.isNotEmpty) {
-          await StorageMethods().deleteImageFromStorage(photoUrl);
-        }
-      } catch (cleanupError) {
-        avoidPrint('Error cleaning up uploaded image: $cleanupError');
+      // Clean up ảnh nếu lỗi
+      if (uploadedPhotoUrl != null && uploadedPhotoUrl.isNotEmpty) {
+        try {
+          await StorageMethods().deleteImageFromStorage(uploadedPhotoUrl);
+        } catch (_) {}
       }
-      
       rethrow;
     }
   }
