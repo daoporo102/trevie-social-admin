@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:social_media_admin/utils/colors.dart';
 
@@ -9,7 +8,12 @@ class TextFieldInput extends StatelessWidget {
   final TextInputType textInputType;
   final IconData? prefixIcon;
   final String labelText;
-  final int maxLines ;
+  final int maxLines;
+  // This state variable for loading
+  final bool isLoading;
+  final String? helperText;
+  final int? maxLength;
+
   const TextFieldInput({
     super.key,
     required this.textEditingController,
@@ -19,6 +23,9 @@ class TextFieldInput extends StatelessWidget {
     required this.prefixIcon,
     required this.labelText,
     this.maxLines = 1,
+    required this.isLoading,
+    this.helperText,
+    this.maxLength,
   });
 
   @override
@@ -46,9 +53,12 @@ class TextFieldInput extends StatelessWidget {
           vertical: 14,
           horizontal: 12,
         ),
+        helperText: helperText,
       ),
       keyboardType: textInputType,
       obscureText: isPass,
+      enabled: isLoading,
+      maxLength: maxLength,
     );
   }
 }

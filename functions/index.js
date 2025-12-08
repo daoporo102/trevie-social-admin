@@ -1,50 +1,48 @@
-const functions = require("firebase-functions");
+/**
+ * index.js - Viết lại chuẩn Cloud Functions v2
+ * Region: asia-southeast1 (Singapore)
+ */
+
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {setGlobalOptions} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 
-// Initialize Firebase Admin SDK
+// Khởi tạo Admin SDK
 admin.initializeApp();
 
+// CẤU HÌNH CHUNG: Ép toàn bộ functions chạy ở Singapore
+setGlobalOptions({region: "asia-southeast1", maxInstances: 10});
+
 /**
- * Cloud Function to set admin custom claim
- * Only callable by existing admins or super admins
+ * 1. Set Admin Claim
  */
-exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-  // Check if the user is authenticated
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-        "permission-denied",
-        "Bạn phải đăng nhập để thực hiện hành động này",
-    );
+exports.setAdminClaim = onCall(async (request) => {
+  // Trong v2: data và auth nằm trong biến 'request'
+  const {data, auth} = request;
+
+  // Check đăng nhập
+  if (!auth) {
+    throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
   }
 
-  // Check if requester is an admin
-  if (!context.auth.token.admin && !context.auth.token.superAdmin) {
-    throw new functions.https.HttpsError(
-        "permission-denied",
-        "Chỉ quản trị viên mới có thể tạo quản trị viên khác",
-    );
+  // Check quyền (Admin hoặc SuperAdmin mới được tạo Admin khác)
+  if (!auth.token.admin && !auth.token.superAdmin) {
+    throw new HttpsError("permission-denied", "Chỉ quản trị viên mới có thể tạo quản trị viên khác");
   }
 
   const {email} = data;
 
-  // Validate email parameter
   if (!email || typeof email !== "string") {
-    throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Địa chỉ email không hợp lệ",
-    );
+    throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
   }
 
   try {
-    // Get user by email
     const user = await admin.auth().getUserByEmail(email);
 
-    // Set custom claim 'admin' to true
+    // Set admin: true
     await admin.auth().setCustomUserClaims(user.uid, {admin: true});
 
-    // Log the action
-    const logMessage = `Admin claim set for user ${email}`;
-    console.log(`${logMessage} (UID: ${user.uid})`);
+    console.log(`Admin claim set for user ${email} (UID: ${user.uid})`);
 
     return {
       success: true,
@@ -53,163 +51,193 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     console.error("Error setting admin claim:", error);
-    const errorMessage = `Không thể thiết lập quyền: ${error.message}`;
-    throw new functions.https.HttpsError("internal", errorMessage);
+    throw new HttpsError("internal", `Không thể thiết lập quyền: ${error.message}`);
   }
 });
 
 /**
- * Cloud Function to remove admin custom claim
- * Only callable by super admins
+ * 2. Remove Admin Claim
  */
-exports.removeAdminClaim = functions.https.onCall(
-    async (data, context) => {
-      // Check if the user is authenticated
-      if (!context.auth) {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Bạn phải đăng nhập để thực hiện hành động này",
-        );
-      }
+exports.removeAdminClaim = onCall(async (request) => {
+  const {data, auth} = request;
 
-      // Only super admins can remove admin status
-      if (!context.auth.token.superAdmin) {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Chỉ super admin mới có thể xóa quyền quản trị viên",
-        );
-      }
+  if (!auth) {
+    throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
+  }
 
-      const {email} = data;
+  // Chỉ Super Admin mới được xóa quyền
+  if (!auth.token.superAdmin) {
+    throw new HttpsError("permission-denied", "Chỉ super admin mới có thể xóa quyền quản trị viên");
+  }
 
-      // Validate email parameter
-      if (!email || typeof email !== "string") {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Địa chỉ email không hợp lệ",
-        );
-      }
+  const {email} = data;
 
-      try {
-        // Get user by email
-        const user = await admin.auth().getUserByEmail(email);
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
+  }
 
-        // Remove custom claim 'admin'
-        await admin.auth().setCustomUserClaims(user.uid, {admin: false});
+  try {
+    const user = await admin.auth().getUserByEmail(email);
 
-        // Log the action
-        const logMessage = `Admin claim removed for user ${email}`;
-        console.log(`${logMessage} (UID: ${user.uid})`);
+    // Set admin: false (xóa quyền)
+    await admin.auth().setCustomUserClaims(user.uid, {admin: false});
 
-        return {
-          success: true,
-          message: `Đã xóa quyền quản trị viên của ${email}`,
-          uid: user.uid,
-        };
-      } catch (error) {
-        console.error("Error removing admin claim:", error);
-        const errorMessage = `Không thể xóa quyền: ${error.message}`;
-        throw new functions.https.HttpsError("internal", errorMessage);
-      }
-    },
-);
+    console.log(`Admin claim removed for user ${email} (UID: ${user.uid})`);
+
+    return {
+      success: true,
+      message: `Đã xóa quyền quản trị viên của ${email}`,
+      uid: user.uid,
+    };
+  } catch (error) {
+    console.error("Error removing admin claim:", error);
+    throw new HttpsError("internal", `Không thể xóa quyền: ${error.message}`);
+  }
+});
 
 /**
- * Cloud Function to check if user is admin
- * Callable by any authenticated user
+ * 3. Check Admin Status
  */
-exports.checkAdminStatus = functions.https.onCall(
-    async (data, context) => {
-      // Check if the user is authenticated
-      if (!context.auth) {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Bạn phải đăng nhập để thực hiện hành động này",
-        );
-      }
+exports.checkAdminStatus = onCall(async (request) => {
+  const {data, auth} = request;
 
-      const {email} = data;
+  if (!auth) {
+    throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
+  }
 
-      try {
-        // Get user by email or from token
-        const emailToCheck = email || context.auth.token.email;
-        const user = await admin.auth().getUserByEmail(emailToCheck);
-        // Get user record
-        const userRecord = await admin.auth().getUser(user.uid);
+  const {email} = data;
 
-        // Safely check custom claims
-        const customClaims = userRecord.customClaims || {};
+  try {
+    // Nếu không gửi email lên thì lấy email của người đang gọi
+    const emailToCheck = email || auth.token.email;
 
-        return {
-          isAdmin: customClaims.admin === true,
-          isSuperAdmin: customClaims.superAdmin === true,
-          email: user.email,
-        };
-      } catch (error) {
-        console.error("Error checking admin status:", error);
-        const errorMessage = `Không thể kiểm tra quyền: ${error.message}`;
-        throw new functions.https.HttpsError("internal", errorMessage);
-      }
-    },
-);
+    const user = await admin.auth().getUserByEmail(emailToCheck);
+    const userRecord = await admin.auth().getUser(user.uid);
+    const customClaims = userRecord.customClaims || {};
+
+    console.log(`Kiểm tra quyền cho: ${emailToCheck}`);
+    console.log(`Claims hiện tại:`, JSON.stringify(customClaims));
+
+    return {
+      isAdmin: customClaims.admin === true,
+      isSuperAdmin: customClaims.superAdmin === true,
+      email: user.email,
+    };
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    throw new HttpsError("internal", `Không thể kiểm tra quyền: ${error.message}`);
+  }
+});
 
 /**
- * Cloud Function to set super admin claim
- * Can only be called once manually with a secret key
+ * 4. Set Super Admin Claim (Dùng Secret Key)
  */
-exports.setSuperAdminClaim = functions.https.onCall(
-    async (data, context) => {
-      const {email, secretKey} = data;
+exports.setSuperAdminClaim = onCall(async (request) => {
+  const {data} = request; // Không bắt buộc auth vì dùng secret key
+  const {email, secretKey} = data;
 
-      // Get secret from Firebase config INSIDE the function
-      let expectedSecret = "my_default_secret_key";
-      try {
-        const config = functions.config();
-        if (config.superadmin && config.superadmin.secret) {
-          expectedSecret = config.superadmin.secret;
-        }
-      } catch (configError) {
-        console.warn("Could not load Firebase config, using default secret");
-      }
+  // Secret key mặc định (Bạn nên đổi cái này hoặc dùng .env)
+  const expectedSecret = "my_default_secret_key";
 
-      // Validate secret key
-      if (secretKey !== expectedSecret) {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Secret key không hợp lệ",
-        );
-      }
+  if (secretKey !== expectedSecret) {
+    throw new HttpsError("permission-denied", "Secret key không hợp lệ");
+  }
 
-      // Validate email
-      if (!email || typeof email !== "string") {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Địa chỉ email không hợp lệ",
-        );
-      }
+  if (!email || typeof email !== "string") {
+    throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
+  }
 
-      try {
-        // Get user by email
-        const user = await admin.auth().getUserByEmail(email);
+  try {
+    const user = await admin.auth().getUserByEmail(email);
 
-        // Set custom claim 'superAdmin' to true
-        await admin.auth().setCustomUserClaims(user.uid, {
-          admin: true,
-          superAdmin: true,
-        });
+    // Cấp cả Admin và SuperAdmin
+    await admin.auth().setCustomUserClaims(user.uid, {
+      admin: true,
+      superAdmin: true,
+    });
 
-        const logMessage = `Super admin claim set for user ${email}`;
-        console.log(`${logMessage} (UID: ${user.uid})`);
+    console.log(`Super admin claim set for user ${email} (UID: ${user.uid})`);
 
-        return {
-          success: true,
-          message: `Đã cấp quyền super admin cho ${email}`,
-          uid: user.uid,
-        };
-      } catch (error) {
-        console.error("Error setting super admin claim:", error);
-        const errorMessage = `Không thể cấp quyền: ${error.message}`;
-        throw new functions.https.HttpsError("internal", errorMessage);
-      }
-    },
-);
+    return {
+      success: true,
+      message: `Đã cấp quyền super admin cho ${email}`,
+      uid: user.uid,
+    };
+  } catch (error) {
+    console.error("Error setting super admin claim:", error);
+    throw new HttpsError("internal", `Không thể cấp quyền: ${error.message}`);
+  }
+});
+
+/**
+ * 5. Create User (Only Super Admin)
+ */
+exports.createUser = onCall(async (request) => {
+  const {data, auth} = request;
+
+  if (!auth) {
+    throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
+  }
+
+  // Chỉ Super Admin mới được tạo user
+  if (!auth.token.superAdmin) {
+    throw new HttpsError("permission-denied", "Chỉ super admin mới có thể tạo người dùng mới");
+  }
+
+  const {email, password, displayName, bio, dateOfBirth, photoUrl} = data;
+
+  // Validation
+  if (!email || typeof email !== "string") throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
+  if (!password || password.length < 6) throw new HttpsError("invalid-argument", "Mật khẩu phải có ít nhất 6 ký tự");
+  if (!displayName) throw new HttpsError("invalid-argument", "Tên hiển thị không được để trống");
+  if (!photoUrl) throw new HttpsError("invalid-argument", "Ảnh đại diện là bắt buộc");
+
+  try {
+    // Tạo user bên Auth
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: displayName,
+      photoURL: photoUrl,
+    });
+
+    // Tạo user bên Firestore
+    const userDoc = {
+      uid: userRecord.uid,
+      displayName: displayName,
+      email: email,
+      photoUrl: photoUrl,
+      bio: bio || "",
+      // Chuyển đổi ngày tháng
+      dateOfBirth: dateOfBirth ? admin.firestore.Timestamp.fromDate(new Date(dateOfBirth)) : null,
+      createdAt: admin.firestore.Timestamp.now(),
+      followers: [],
+      following: [],
+      isSuspended: false,
+      suspendedAt: null,
+      isDeleted: false,
+    };
+
+    await admin.firestore()
+        .collection("users")
+        .doc(userRecord.uid)
+        .set(userDoc);
+
+    console.log(`User created: ${email} by super admin ${auth.token.email}`);
+
+    return {
+      success: true,
+      message: `Đã tạo người dùng thành công: ${email}`,
+      uid: userRecord.uid,
+      user: userDoc,
+    };
+  } catch (error) {
+    console.error("Error creating user:", error);
+
+    if (error.code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "Email đã được sử dụng");
+    }
+
+    throw new HttpsError("internal", `Không thể tạo người dùng: ${error.message}`);
+  }
+});

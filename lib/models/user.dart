@@ -10,6 +10,9 @@ class User {
   final DateTime createdAt;
   final List followers;
   final List following;
+  final bool isSuspended;
+  final DateTime? suspendedAt;
+  final bool isDeleted;
 
   const User({
     required this.uid,
@@ -21,6 +24,9 @@ class User {
     required this.followers,
     required this.following,
     required this.createdAt,
+    this.isSuspended = false,
+    this.suspendedAt,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,15 +34,22 @@ class User {
     "displayName": displayName,
     "email": email,
     "bio": bio,
-    "dateOfBirth": dateOfBirth?.toIso8601String(),
+    "dateOfBirth": dateOfBirth != null
+        ? Timestamp.fromDate(dateOfBirth!)
+        : null,
     "createdAt": Timestamp.fromDate(createdAt),
     "photoUrl": photoUrl,
     "followers": followers,
     "following": following,
+    "isSuspended": isSuspended,
+    "suspendedAt": suspendedAt != null
+        ? Timestamp.fromDate(suspendedAt!)
+        : null,
+    "isDeleted": isDeleted,
   };
 
-  static User fromSnap(DocumentSnapshot spapshot) {
-    var snapshotData = spapshot.data() as Map<String, dynamic>;
+  static User fromSnap(DocumentSnapshot snapshot) {
+    var snapshotData = snapshot.data() as Map<String, dynamic>;
 
     // Helper function to safely convert Timestamp to DateTime
     DateTime? parseDateField(dynamic value) {
@@ -64,6 +77,10 @@ class User {
       bio: snapshotData.containsKey("bio") ? snapshotData["bio"] : '',
       dateOfBirth: parseDateField(snapshotData["dateOfBirth"]),
       createdAt: parseDateField(snapshotData['createdAt']) ?? DateTime.now(),
+      isSuspended:
+          snapshotData['isSuspended'] == true, // Defaults to false if null
+      suspendedAt: parseDateField(snapshotData['suspendedAt']),
+      isDeleted: snapshotData['isDeleted'] == true, // Defaults to false if null
     );
   }
 }

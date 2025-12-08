@@ -1,3 +1,5 @@
 node_modules/
 *.local
 serviceAccountKey.json
+set_first_admin.js
+.env
