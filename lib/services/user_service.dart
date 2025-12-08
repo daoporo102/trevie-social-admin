@@ -719,4 +719,26 @@ class UserService {
       rethrow;
     }
   }
+
+  // ...existing code...
+
+  // Helper method: Delete user from Firebase Authentication
+  Future<bool> _deleteUserFromAuth(String uid) async {
+    try {
+      final callable = _functions.httpsCallable('deleteUserAuth');
+      final result = await callable.call({'uid': uid});
+      
+      if (result.data['success'] == true) {
+        avoidPrint('Successfully deleted user from Firebase Auth: $uid');
+        return true;
+      }
+      return false;
+    } on FirebaseFunctionsException catch (e) {
+      avoidPrint('Firebase Functions error deleting user from Auth: ${e.code} - ${e.message}');
+      return false;
+    } catch (e) {
+      avoidPrint('Unexpected error deleting user from Auth: $e');
+      return false;
+    }
+  }
 }
