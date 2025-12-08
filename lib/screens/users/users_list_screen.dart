@@ -12,6 +12,7 @@ import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/add_user_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 import 'package:social_media_admin/services/admin_management_service.dart';
+import 'package:social_media_admin/widgets/delete_user_dialog.dart';
 import 'package:social_media_admin/widgets/update_user_dialog.dart';
 
 class UsersListScreen extends StatefulWidget {
@@ -235,31 +236,17 @@ class _UsersListScreenState extends State<UsersListScreen> {
   }
 
   Future<void> _deleteUser(model.User user) async {
-    // Sho confirmation dialog
-    final confirm = await showDialog<bool>(
+    // Show confirmation dialog
+    final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text(
-          'Bạn có chắc chắn muốn xóa người dùng "${user.displayName}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: errorBackgroundColor),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (context) => DeleteUserDialog(user: user),
     );
 
-    if (confirm != true || !mounted) return;
+    // User cancelled
+    if (reason == null || !mounted) return;
 
-    final result = await _userService.deleteUser(user.uid);
+    final result = await _userService.deleteUser(user.uid, reason);
 
     if (!mounted) return;
 
@@ -368,7 +355,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
             onPressed: () async {
               await _adminAuthService.refreshUserToken();
 
-              if(context.mounted){
+              if (context.mounted) {
                 displaySnackBar(
                   'Đã làm mới phiên đăng nhập',
                   context,
@@ -600,47 +587,65 @@ class _UsersListScreenState extends State<UsersListScreen> {
         columnSpacing: 12,
         horizontalMargin: 12,
         minWidth: 900,
-        columns: const [
-          DataColumn2(
+        columns: [
+          const DataColumn2(
             label: Text(
               'Ảnh đại diện',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             size: ColumnSize.S,
           ),
-          DataColumn2(
+          const DataColumn2(
             label: Text(
               'Tên hiển thị',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             size: ColumnSize.M,
           ),
-          DataColumn2(
+          const DataColumn2(
             label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold)),
             size: ColumnSize.L,
           ),
-          DataColumn2(
+          const DataColumn2(
             label: Text(
               'Ngày đăng ký',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             size: ColumnSize.M,
           ),
-          DataColumn2(
-            label: Text(
-              'Người theo dõi/ Đang theo dõi',
-              style: TextStyle(fontWeight: FontWeight.bold),
+          // Add "Ngày xóa" column only when showing deleted users
+          if (_showDeletedUsers)
+            const DataColumn2(
+              label: Text(
+                'Ngày xóa',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              size: ColumnSize.M,
             ),
-            size: ColumnSize.M,
-          ),
-          DataColumn2(
+          if (!_showDeletedUsers)
+            const DataColumn2(
+              label: Text(
+                'Người theo dõi / Đang theo dõi',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              size: ColumnSize.M,
+            )
+          else
+            const DataColumn2(
+              label: Text(
+                'Lý do xoá',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              size: ColumnSize.M,
+            ),
+          const DataColumn2(
             label: Text(
               'Trạng thái',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             size: ColumnSize.S,
           ),
-          DataColumn2(
+          const DataColumn2(
             label: Text(
               'Hành động',
               style: TextStyle(fontWeight: FontWeight.bold),
@@ -670,6 +675,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
+                // Add extra cell for "Ngày xóa" column when showing deleted users
+                if (_showDeletedUsers) const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
@@ -704,40 +711,90 @@ class _UsersListScreenState extends State<UsersListScreen> {
             style: const TextStyle(fontWeight: FontWeight.w500),
           ),
         ),
+
         // Email
         DataCell(Text(user.email)),
+
         // Created At
         DataCell(Text(DateFormat('dd/MM/yyyy').format(user.createdAt))),
 
-        // Followers / Following
-        DataCell(Text('${user.followers.length} / ${user.following.length}')),
+        // Deleted At - Add this new cell (only when showing deleted users)
+        if (_showDeletedUsers)
+          DataCell(
+            Text(
+              user.deletedAt != null
+                  ? DateFormat('HH:mm dd/MM/yyyy').format(user.deletedAt!)
+                  : 'N/A',
+              style: TextStyle(fontSize: 13, color: secondaryColor),
+            ),
+          ),
+
+        // Conditionally show Followers/Following OR Deletion Reason
+        DataCell(
+          _showDeletedUsers
+              ? // Show deletion reason when in trash view
+                (user.deletionReason != null && user.deletionReason!.isNotEmpty
+                    ? Tooltip(
+                        message: user.deletionReason!,
+                        child: Text(
+                          user.deletionReason!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: secondaryColor),
+                        ),
+                      )
+                    : Text(
+                        'Không có lý do',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: secondaryColor,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ))
+              : // Show followers/following when in normal view
+                Text('${user.followers.length} / ${user.following.length}'),
+        ),
 
         // Status
         DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            decoration: BoxDecoration(
-              color: user.isDeleted
-                  ? secondaryColor
-                  : user.isSuspended
-                  ? errorBackgroundColor.withValues(alpha: 0.1)
-                  : appPrimaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              user.isDeleted
-                  ? 'Đã bị xóa'
-                  : user.isSuspended
-                  ? 'Đã bị đình chỉ'
-                  : 'Đang hoạt động',
-              style: TextStyle(
-                color: user.isDeleted
-                    ? secondaryColor
-                    : user.isSuspended
-                    ? errorBackgroundColor
-                    : appPrimaryColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          SizedBox(
+            height: 48,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 4,
+                      horizontal: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: user.isDeleted
+                          ? secondaryColor
+                          : user.isSuspended
+                          ? errorBackgroundColor.withValues(alpha: 0.1)
+                          : appPrimaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      user.isDeleted
+                          ? 'Đã bị xóa'
+                          : user.isSuspended
+                          ? 'Đã bị đình chỉ'
+                          : 'Đang hoạt động',
+                      style: TextStyle(
+                        color: user.isDeleted
+                            ? onPrimaryColor
+                            : user.isSuspended
+                            ? errorBackgroundColor
+                            : appPrimaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

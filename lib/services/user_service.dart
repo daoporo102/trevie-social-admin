@@ -147,11 +147,16 @@ class UserService {
   }
 
   // Delete user (soft delete - mark as deleted)
-  Future<String> deleteUser(String userId) async {
+  Future<String> deleteUser(String userId, String reason) async {
     try {
+      // Validate reason
+      if (reason.trim().isEmpty) {
+        return 'Vui lòng nhập lý do xóa người dùng';
+      }
       await _firestore.collection('users').doc(userId).update({
         'isDeleted': true,
         'deletedAt': Timestamp.now(),
+        'deletionReason': reason.trim(),
       });
       return 'success';
     } catch (e) {
@@ -249,6 +254,7 @@ class UserService {
       await _firestore.collection('users').doc(userId).update({
         'isDeleted': false,
         'deletedAt': null,
+        'deletionReason': null,
       });
       return 'success';
     } catch (e) {
@@ -325,6 +331,14 @@ class UserService {
 
       // Step 6: Delete user document from Firestore (ONLY ONCE!)
       await _firestore.collection('users').doc(uid).delete();
+
+      // Step 7: Delete user from Firebase Authentication
+      final authDeleted = await _deleteUserFromAuth(uid);
+      if (!authDeleted) {
+        avoidPrint(
+          'Warning: User data deleted from Firestore but Auth deletion failed',
+        );
+      }
 
       avoidPrint('Successfully deleted all data for user: $uid');
 
@@ -717,6 +731,30 @@ class UserService {
     } catch (e) {
       avoidPrint('Error updating user comments: $e');
       rethrow;
+    }
+  }
+
+  // ...existing code...
+
+  // Helper method: Delete user from Firebase Authentication
+  Future<bool> _deleteUserFromAuth(String uid) async {
+    try {
+      final callable = _functions.httpsCallable('deleteUserAuth');
+      final result = await callable.call({'uid': uid});
+
+      if (result.data['success'] == true) {
+        avoidPrint('Successfully deleted user from Firebase Auth: $uid');
+        return true;
+      }
+      return false;
+    } on FirebaseFunctionsException catch (e) {
+      avoidPrint(
+        'Firebase Functions error deleting user from Auth: ${e.code} - ${e.message}',
+      );
+      return false;
+    } catch (e) {
+      avoidPrint('Unexpected error deleting user from Auth: $e');
+      return false;
     }
   }
 }
