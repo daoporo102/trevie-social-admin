@@ -12,6 +12,7 @@ import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/add_user_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 import 'package:social_media_admin/services/admin_management_service.dart';
+import 'package:social_media_admin/widgets/update_user_dialog.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -333,6 +334,19 @@ class _UsersListScreenState extends State<UsersListScreen> {
     } else {
       displaySnackBar(result, context, SnackBarType.error);
     }
+  }
+
+  Future<void> _showUpdateUserDialog(model.User user) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => UpdateUserDialog(
+        user: user,
+        onUserUpdated: () {
+          _loadUsers(refresh: true);
+        },
+      ),
+    );
   }
 
   @override
@@ -751,19 +765,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
                     ),
                   ]
                 : [
-                    // View/Edit
+                    // View/Edit - UPDATE USER
                     IconButton(
                       icon: const Icon(Icons.edit, size: 20),
                       tooltip: 'Chỉnh sửa',
                       color: infoBackgroundColor,
-                      onPressed: () {
-                        // TODO: Navigate to user detail/edit screen
-                        displaySnackBar(
-                          'Chức năng chỉnh sửa đang phát triển',
-                          context,
-                          SnackBarType.info,
-                        );
-                      },
+                      onPressed: () => _showUpdateUserDialog(user),
                     ),
 
                     // Suspend/Activate
