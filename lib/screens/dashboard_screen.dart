@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:social_media_admin/services/admin_management_service.dart';
 import 'package:social_media_admin/services/dashboard_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
@@ -14,6 +16,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardService _dashboardService = DashboardService();
+  final AdminManagementService _adminService = AdminManagementService();
 
   // Statistics
   int _totalUsers = 0;
@@ -38,6 +41,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadDashboardData();
+    _verifyAdminAccess();
+  }
+
+  Future<void> _verifyAdminAccess() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null && user.email != null) {
+      try {
+        print("Đang chuẩn bị kiểm tra quyền...");
+
+        // --- BƯỚC QUAN TRỌNG NHẤT (THÊM DÒNG NÀY) ---
+        // Buộc lấy token mới để đảm bảo SDK đã sẵn sàng
+        // Việc này giúp đồng bộ Auth State trước khi gọi Function
+        String? token = await user.getIdToken(true);
+        print("Token đã sẵn sàng, bắt đầu gọi Function...");
+        // ---------------------------------------------
+
+        final status = await _adminService.checkAdminStatus(user.email!);
+
+        print("Kết quả check: $status");
+
+        if (status['isAdmin'] == true) {
+          // Nếu là admin, lại refresh lần nữa để đảm bảo các request sau này (như tạo user) ok
+          await user.getIdToken(true);
+          print("Đã đồng bộ quyền Admin thành công!");
+          setState(() {
+            // Cập nhật UI nếu cần
+          });
+        } else {
+          print("Tài khoản này không có quyền truy cập Dashboard");
+        }
+      } catch (e) {
+        print("Lỗi khi verify admin: $e");
+      }
+    } else {
+      print("User chưa đăng nhập (User is null)");
+    }
   }
 
   Future<void> _loadDashboardData() async {

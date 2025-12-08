@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:social_media_admin/models/user.dart' as model;
 import 'package:social_media_admin/resources/storage_methods.dart';
 import 'package:social_media_admin/utils/utils.dart';
@@ -9,6 +12,8 @@ enum UserSortField { displayName, createdAt, followers }
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Get paginated users list
   Future<Map<String, dynamic>> getUsers({
@@ -230,12 +235,9 @@ class UserService {
   // Permanently delete user
   Future<String> permanentlyDeleteUser(String uid) async {
     try {
-      // Delete user document from Firestore
-      await _firestore.collection('users').doc(uid).delete();
-
-      // Get user document to retrieve photoUrl
+      // Step 1: Get user document to retrieve photoUrl BEFORE deleting
       final userDoc = await _firestore.collection('users').doc(uid).get();
-      
+
       if (!userDoc.exists) {
         return 'Người dùng không tồn tại';
       }
@@ -262,7 +264,7 @@ class UserService {
       // Step 5: Remove user from followers/following lists of other users
       await _removeUserFromFollowLists(uid);
 
-      // Step 6: Delete user document from Firestore
+      // Step 6: Delete user document from Firestore (ONLY ONCE!)
       await _firestore.collection('users').doc(uid).delete();
 
       avoidPrint('Successfully deleted all data for user: $uid');
@@ -288,7 +290,9 @@ class UserService {
         return;
       }
 
-      avoidPrint('Found ${postsSnapshot.docs.length} posts to delete for user $uid');
+      avoidPrint(
+        'Found ${postsSnapshot.docs.length} posts to delete for user $uid',
+      );
 
       WriteBatch batch = _firestore.batch();
       int batchCount = 0;
@@ -297,7 +301,7 @@ class UserService {
       for (var postDoc in postsSnapshot.docs) {
         final postData = postDoc.data();
         final String? postUrl = postData['postUrl'];
-        
+
         // Collect image URLs to delete from Storage
         if (postUrl != null && postUrl.isNotEmpty) {
           imageUrls.add(postUrl);
@@ -307,7 +311,7 @@ class UserService {
         final commentsSnapshot = await postDoc.reference
             .collection('comments')
             .get();
-        
+
         for (var commentDoc in commentsSnapshot.docs) {
           batch.delete(commentDoc.reference);
           batchCount++;
@@ -401,7 +405,7 @@ class UserService {
     try {
       // Get the user's followers and following lists
       final userDoc = await _firestore.collection('users').doc(uid).get();
-      
+
       if (!userDoc.exists) return;
 
       final userData = userDoc.data() as Map<String, dynamic>;
@@ -415,7 +419,7 @@ class UserService {
       for (String followerId in followers) {
         final followerRef = _firestore.collection('users').doc(followerId);
         batch.update(followerRef, {
-          'following': FieldValue.arrayRemove([uid])
+          'following': FieldValue.arrayRemove([uid]),
         });
         batchCount++;
 
@@ -430,7 +434,7 @@ class UserService {
       for (String followingId in following) {
         final followingRef = _firestore.collection('users').doc(followingId);
         batch.update(followingRef, {
-          'followers': FieldValue.arrayRemove([uid])
+          'followers': FieldValue.arrayRemove([uid]),
         });
         batchCount++;
 
@@ -446,9 +450,117 @@ class UserService {
         await batch.commit();
       }
 
-      avoidPrint('Removed user $uid from ${followers.length} followers and ${following.length} following lists');
+      avoidPrint(
+        'Removed user $uid from ${followers.length} followers and ${following.length} following lists',
+      );
     } catch (e) {
       avoidPrint('Error removing user from follow lists: $e');
+      rethrow;
+    }
+  }
+
+  // Create a new user (for Super Admins)
+  Future<model.User?> createUser({
+    required String email,
+    required String password,
+    required String displayName,
+    String? bio,
+    DateTime? dateOfBirth,
+    required Uint8List image,
+  }) async {
+    try {
+      // Force refresh token before making the call
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.getIdToken(true);
+        avoidPrint('Token refreshed before creating user');
+      }
+
+      // First upload the profile image
+      final photoUrl = await StorageMethods().uploadImageToStorage(
+        'profilePics',
+        image,
+        false,
+      );
+
+      if (photoUrl.isEmpty) {
+        throw Exception('Không thể tải ảnh lên');
+      }
+
+      // Call Cloud Function to create user
+      final callable = _functions.httpsCallable('createUser');
+      final result = await callable.call({
+        'email': email,
+        'password': password,
+        'displayName': displayName,
+        'bio': bio,
+        'dateOfBirth': dateOfBirth?.toIso8601String(),
+        'photoUrl': photoUrl,
+      });
+
+      if (result.data['success'] == true) {
+        final userData = result.data['user'] as Map<String, dynamic>;
+        
+        // Convert Firestore timestamps back to DateTime
+        if (userData['createdAt'] != null) {
+          final timestamp = userData['createdAt'] as Timestamp;
+          userData['createdAt'] = timestamp;
+        }
+        if (userData['dateOfBirth'] != null) {
+          final timestamp = userData['dateOfBirth'] as Timestamp;
+          userData['dateOfBirth'] = timestamp;
+        }
+
+        // Create User object from the returned data
+        final user = model.User(
+          uid: userData['uid'],
+          displayName: userData['displayName'],
+          email: userData['email'],
+          photoUrl: userData['photoUrl'],
+          bio: userData['bio'],
+          dateOfBirth: userData['dateOfBirth']?.toDate(),
+          createdAt: userData['createdAt']?.toDate() ?? DateTime.now(),
+          followers: List.from(userData['followers'] ?? []),
+          following: List.from(userData['following'] ?? []),
+          isSuspended: userData['isSuspended'] ?? false,
+          suspendedAt: userData['suspendedAt']?.toDate(),
+          isDeleted: userData['isDeleted'] ?? false,
+        );
+
+        return user;
+      } else {
+        throw Exception(result.data['message'] ?? 'Không thể tạo người dùng');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      avoidPrint('Functions error: ${e.code} - ${e.message}');
+      
+      switch (e.code) {
+        case 'permission-denied':
+          throw Exception('Bạn không có quyền tạo người dùng');
+        case 'already-exists':
+          throw Exception('Email đã được sử dụng');
+        case 'invalid-argument':
+          throw Exception(e.message ?? 'Thông tin không hợp lệ');
+        default:
+          throw Exception(e.message ?? 'Đã xảy ra lỗi');
+      }
+    } catch (e) {
+      avoidPrint('Error creating user: $e');
+      
+      // If there was an error after uploading the image, try to clean it up
+      try {
+        final photoUrl = await StorageMethods().uploadImageToStorage(
+          'profilePics',
+          image,
+          false,
+        );
+        if (photoUrl.isNotEmpty) {
+          await StorageMethods().deleteImageFromStorage(photoUrl);
+        }
+      } catch (cleanupError) {
+        avoidPrint('Error cleaning up uploaded image: $cleanupError');
+      }
+      
       rethrow;
     }
   }

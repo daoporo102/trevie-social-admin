@@ -7,7 +7,20 @@ class AdminAuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// Check if current user is admin
+  /// Force refresh the authentication token to get updated custom claims
+  Future<void> refreshUserToken() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.getIdToken(true); // Force refresh
+        avoidPrint('Token refreshed successfully');
+      }
+    } catch (e) {
+      avoidPrint('Error refreshing token: $e');
+    }
+  }
+
+  /// Check if current user is admin (with forced token refresh)
   Future<bool> isAdmin() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -21,19 +34,34 @@ class AdminAuthService {
       return false;
     }
   }
-  
+
+  /// Check if current user is super admin (with forced token refresh)
+  Future<bool> isSuperAdmin() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      // Force refresh token to get latest claims
+      final idTokenResult = await user.getIdTokenResult(true);
+      return idTokenResult.claims?['superAdmin'] == true;
+    } catch (e) {
+      avoidPrint('Error checking super admin status: $e');
+      return false;
+    }
+  }
+
   /// Admin login
-  Future<String> adminLogin({required String email, required String password}) async {
+  Future<String> adminLogin({
+    required String email,
+    required String password,
+  }) async {
     try {
       if (email.isEmpty || password.isEmpty) {
         return 'Vui lòng điền đầy đủ thông tin';
       }
 
       // Sign in user
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
 
       // Wait a bit for token to be available
       await Future.delayed(const Duration(milliseconds: 500));
@@ -85,7 +113,7 @@ class AdminAuthService {
     final user = _auth.currentUser;
     if (user == null) return null;
 
-    final idTokenResult = await user.getIdTokenResult();
+    final idTokenResult = await user.getIdTokenResult(true); // Force refresh
 
     return {
       'uid': user.uid,

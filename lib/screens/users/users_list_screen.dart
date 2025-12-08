@@ -1,13 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:social_media_admin/models/user.dart' as model;
+import 'package:social_media_admin/services/admin_auth_service.dart';
 import 'package:social_media_admin/services/user_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
+import 'package:social_media_admin/widgets/add_user_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
+import 'package:social_media_admin/services/admin_management_service.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -19,6 +23,7 @@ class UsersListScreen extends StatefulWidget {
 class _UsersListScreenState extends State<UsersListScreen> {
   final UserService _userService = UserService();
   final TextEditingController _searchController = TextEditingController();
+  final AdminAuthService _adminAuthService = AdminAuthService(); // Add this
   bool _showDeletedUsers = false;
 
   List<model.User> _users = [];
@@ -37,18 +42,63 @@ class _UsersListScreenState extends State<UsersListScreen> {
   bool _ascending = false;
   String _searchQuery = '';
 
+  bool _isSuperAdmin = false;
+  final AdminManagementService _adminService = AdminManagementService();
+
   @override
   void initState() {
     super.initState();
     _loadUsers();
     _loadTotalCount();
     _loadTotalDeletedUsersCount();
+    _checkPermissionBtn();
   }
+
+  Future<void> _checkPermissionBtn() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user?.email != null) {
+    final status = await _adminService.checkAdminStatus(user!.email!);
+    setState(() {
+      // Chỉ Super Admin mới được thấy nút tạo user
+      _isSuperAdmin = status['isSuperAdmin'] ?? false;
+    });
+  }
+}
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showAddUserDialog() async {
+    // First, refresh the token to ensure we have the latest claims
+    await _adminAuthService.refreshUserToken();
+
+    // Check if user is super admin
+    final isSuperAdmin = await _adminAuthService.isSuperAdmin();
+
+    if (!isSuperAdmin) {
+      if (!mounted) return;
+      displaySnackBar(
+        'Chỉ Super Admin mới có thể tạo người dùng mới',
+        context,
+        SnackBarType.error,
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AddUserDialog(
+        onUserCreated: () {
+          // Callback when user is successfully created
+          _loadUsers(refresh: true);
+          _loadTotalCount();
+        },
+      ),
+    );
   }
 
   Future<void> _loadUsers({bool refresh = false}) async {
@@ -298,6 +348,26 @@ class _UsersListScreenState extends State<UsersListScreen> {
         backgroundColor: webBackgroundColor,
         foregroundColor: primaryTextColor,
         actions: [
+          // Add a refresh token button for debugging
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _adminAuthService.refreshUserToken();
+              displaySnackBar(
+                'Đã làm mới phiên đăng nhập',
+                context,
+                SnackBarType.success,
+              );
+            },
+            tooltip: 'Làm mới phiên đăng nhập',
+          ),
+          // Add a Create new User Button (only show when not in trash view)
+          if (!_showDeletedUsers && _isSuperAdmin)
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              onPressed: _showAddUserDialog,
+              tooltip: 'Thêm người dùng mới',
+            ),
           IconButton(
             icon: Icon(
               _showDeletedUsers ? Icons.people : Icons.delete_forever_outlined,

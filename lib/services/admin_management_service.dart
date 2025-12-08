@@ -3,13 +3,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:social_media_admin/utils/utils.dart';
 
 class AdminManagementService {
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  // Khai báo rõ vùng 'us-central1'
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'asia-southeast1',
+  );
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Set admin claim for a user by email
-  Future<String> setAminClaim(String email) async {
+  Future<String> setAdminClaim(String email) async {
     try {
-      final callable = _functions.httpsCallable('setAdminClaim');
+      // Ensure client sends a fresh token that contains up-to-date custom claims
+      await _auth.currentUser?.getIdToken(true);
+
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-southeast1',
+      ).httpsCallable('setAdminClaim');
       final result = await callable.call({'email': email});
 
       avoidPrint('Admin claim result: ${result.data}');
@@ -36,7 +44,12 @@ class AdminManagementService {
   /// Remove admin claim from a user
   Future<String> removeAdminClaim(String email) async {
     try {
-      final callable = _functions.httpsCallable('removeAdminClaim');
+      // Ensure client sends a fresh token that contains up-to-date custom claims
+      await _auth.currentUser?.getIdToken(true);
+
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-southeast1',
+      ).httpsCallable('removeAdminClaim');
       final result = await callable.call({'email': email});
 
       avoidPrint('Remove admin result: ${result.data}');
