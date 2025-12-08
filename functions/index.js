@@ -241,3 +241,22 @@ exports.createUser = onCall(async (request) => {
     throw new HttpsError("internal", `Không thể tạo người dùng: ${error.message}`);
   }
 });
+
+/** 6. Hard Delete User
+ */
+exports.deleteUserAuth = onCall(async (request) => {
+  const {data, auth} = request;
+
+  if (!auth || !auth.token.superAdmin) {
+    throw new HttpsError("permission-denied", "Only super admin can delete users");
+  }
+
+  const {uid} = data;
+
+  try {
+    await admin.auth().deleteUser(uid);
+    return {success: true, message: "User deleted from Auth"};
+  } catch (error) {
+    throw new HttpsError("internal", error.message);
+  }
+});

@@ -147,11 +147,16 @@ class UserService {
   }
 
   // Delete user (soft delete - mark as deleted)
-  Future<String> deleteUser(String userId) async {
+  Future<String> deleteUser(String userId, String reason) async {
     try {
+      // Validate reason
+      if (reason.trim().isEmpty) {
+        return 'Vui lòng nhập lý do xóa người dùng';
+      }
       await _firestore.collection('users').doc(userId).update({
         'isDeleted': true,
         'deletedAt': Timestamp.now(),
+        'deletionReason': reason.trim(),
       });
       return 'success';
     } catch (e) {
@@ -249,6 +254,7 @@ class UserService {
       await _firestore.collection('users').doc(userId).update({
         'isDeleted': false,
         'deletedAt': null,
+        'deletionReason': null,
       });
       return 'success';
     } catch (e) {
