@@ -10,6 +10,7 @@ class Post {
   final String profImage;
   final DateTime datePublished;
   final List<String> likes;
+  final int likesCount;
   final DateTime? dateUpdated;
   final DateTime lastDateModified;
   final int reshareCount;
@@ -37,6 +38,7 @@ class Post {
     this.originalPostText,
     this.originalDisplayName,
     this.originalProfImage,
+    required this.likesCount,
   });
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +60,7 @@ class Post {
     "originalPostText": originalPostText,
     "originalDisplayName": originalDisplayName,
     "originalProfImage": originalProfImage,
+    "likesCount": likes.length,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -103,6 +106,7 @@ class Post {
       originalPostText: snapshotData['originalPostText'],
       originalDisplayName: snapshotData['originalDisplayName'],
       originalProfImage: snapshotData['originalProfImage'],
+      likesCount: snapshotData['likesCount'] ?? snapshotData['likes']?.length ?? 0,
     );
   }
 }
