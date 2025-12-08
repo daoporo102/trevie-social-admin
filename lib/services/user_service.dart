@@ -326,6 +326,14 @@ class UserService {
       // Step 6: Delete user document from Firestore (ONLY ONCE!)
       await _firestore.collection('users').doc(uid).delete();
 
+      // Step 7: Delete user from Firebase Authentication
+      final authDeleted = await _deleteUserFromAuth(uid);
+      if (!authDeleted) {
+        avoidPrint(
+          'Warning: User data deleted from Firestore but Auth deletion failed',
+        );
+      }
+
       avoidPrint('Successfully deleted all data for user: $uid');
 
       return 'success';
@@ -727,14 +735,16 @@ class UserService {
     try {
       final callable = _functions.httpsCallable('deleteUserAuth');
       final result = await callable.call({'uid': uid});
-      
+
       if (result.data['success'] == true) {
         avoidPrint('Successfully deleted user from Firebase Auth: $uid');
         return true;
       }
       return false;
     } on FirebaseFunctionsException catch (e) {
-      avoidPrint('Firebase Functions error deleting user from Auth: ${e.code} - ${e.message}');
+      avoidPrint(
+        'Firebase Functions error deleting user from Auth: ${e.code} - ${e.message}',
+      );
       return false;
     } catch (e) {
       avoidPrint('Unexpected error deleting user from Auth: $e');
