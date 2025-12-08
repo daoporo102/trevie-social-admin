@@ -479,7 +479,7 @@ class UserService {
         await user.getIdToken(true);
       }
 
-      // Upload ảnh
+      // Upload image
       uploadedPhotoUrl = await StorageMethods().uploadImageToStorage(
         'profilePics',
         image,
@@ -490,22 +490,22 @@ class UserService {
         throw Exception('Không thể tải ảnh lên');
       }
 
-      // --- SỬA LỖI 2: LÀM SẠCH DATA (Xóa null) ---
-      // Tạo một map dữ liệu tạm thời
+      // CLEAN DATA (Delete nulls)
+      // Create a temporary data map
       final Map<String, dynamic> payload = {
         'email': email,
         'password': password,
         'displayName': displayName,
         'photoUrl': uploadedPhotoUrl,
-        'bio': bio, // Có thể null
-        'dateOfBirth': dateOfBirth?.toIso8601String(), // Có thể null
+        'bio': bio, // can be null
+        'dateOfBirth': dateOfBirth?.toIso8601String(), // can be null
       };
 
-      // Lệnh này sẽ xóa tất cả các dòng có giá trị null
-      // Giúp tránh lỗi "Invalid request" từ Server
+      // Remove all entries with null values
+      // Helps avoid "Invalid request" errors from the Server
       payload.removeWhere((key, value) => value == null);
 
-      // Gọi Cloud Function với payload đã làm sạch
+      // Call Cloud Function with cleaned payload
       final callable = _functions.httpsCallable('createUser');
       final result = await callable.call(payload);
       // ---------------------------------------------
@@ -557,7 +557,7 @@ class UserService {
       }
       throw Exception(message);
     } catch (e) {
-      // Clean up ảnh nếu lỗi
+      // Clean up image if error occurs
       if (uploadedPhotoUrl != null && uploadedPhotoUrl.isNotEmpty) {
         try {
           await StorageMethods().deleteImageFromStorage(uploadedPhotoUrl);
