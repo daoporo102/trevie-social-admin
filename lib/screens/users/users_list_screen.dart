@@ -55,15 +55,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
   }
 
   Future<void> _checkPermissionBtn() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user?.email != null) {
-    final status = await _adminService.checkAdminStatus(user!.email!);
-    setState(() {
-      // Chỉ Super Admin mới được thấy nút tạo user
-      _isSuperAdmin = status['isSuperAdmin'] ?? false;
-    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user?.email != null) {
+      final status = await _adminService.checkAdminStatus(user!.email!);
+      setState(() {
+        // Chỉ Super Admin mới được thấy nút tạo user
+        _isSuperAdmin = status['isSuperAdmin'] ?? false;
+      });
+    }
   }
-}
 
   @override
   void dispose() {
@@ -353,11 +353,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: () async {
               await _adminAuthService.refreshUserToken();
-              displaySnackBar(
-                'Đã làm mới phiên đăng nhập',
-                context,
-                SnackBarType.success,
-              );
+
+              if(context.mounted){
+                displaySnackBar(
+                  'Đã làm mới phiên đăng nhập',
+                  context,
+                  SnackBarType.success,
+                );
+              }
             },
             tooltip: 'Làm mới phiên đăng nhập',
           ),
