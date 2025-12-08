@@ -133,11 +133,20 @@ class UserService {
   }
 
   // Toggle user suspension status
-  Future<String> toggleUserSuspension(String userId, bool isSuspended) async {
+  Future<String> toggleUserSuspension(
+    String userId,
+    bool isSuspended,
+    String reason,
+  ) async {
     try {
+      // Validate reason
+      if (isSuspended && reason.trim().isEmpty) {
+        return 'Vui lòng nhập lý do đình chỉ người dùng';
+      }
       await _firestore.collection('users').doc(userId).update({
         'isSuspended': isSuspended,
         'suspendedAt': isSuspended ? Timestamp.now() : null,
+        'suspensionReason': isSuspended ? reason.trim() : null,
       });
       return 'success';
     } catch (e) {
