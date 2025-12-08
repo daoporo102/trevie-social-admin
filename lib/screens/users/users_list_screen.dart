@@ -13,6 +13,7 @@ import 'package:social_media_admin/widgets/add_user_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 import 'package:social_media_admin/services/admin_management_service.dart';
 import 'package:social_media_admin/widgets/delete_user_dialog.dart';
+import 'package:social_media_admin/widgets/suspend_user_dialog.dart';
 import 'package:social_media_admin/widgets/update_user_dialog.dart';
 
 class UsersListScreen extends StatefulWidget {
@@ -212,16 +213,32 @@ class _UsersListScreenState extends State<UsersListScreen> {
   }
 
   Future<void> _toggleSuspension(model.User user) async {
+    // Show suspension dialog
+    final reason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          SuspendUserDialog(user: user, isCurrentlySuspended: user.isSuspended),
+    );
+
+    // User cancelled
+    if (reason == null || !mounted) return;
+
+    // Empty string means activating (no reason needed)
+    final shouldSuspend = !user.isSuspended;
+    final finalReason = shouldSuspend ? reason : '';
+
     final result = await _userService.toggleUserSuspension(
       user.uid,
       !user.isSuspended,
+      finalReason,
     );
 
     if (!mounted) return;
 
     if (result == 'success') {
       displaySnackBar(
-        user.isSuspended ? 'Đã kích hoạt người dùng' : 'Đã đình chỉ người dùng',
+        shouldSuspend ? 'Đã đình chỉ người dùng' : 'Đã kích hoạt người dùng',
         context,
         SnackBarType.success,
       );
@@ -587,6 +604,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
         columnSpacing: 12,
         horizontalMargin: 12,
         minWidth: 900,
+        dataRowHeight: 56, // Increase row height
+        headingRowHeight: 56,
         columns: [
           const DataColumn2(
             label: Text(
@@ -622,6 +641,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
               ),
               size: ColumnSize.M,
             ),
+          // Followers/Following or Reason column
           if (!_showDeletedUsers)
             const DataColumn2(
               label: Text(
@@ -645,6 +665,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
             ),
             size: ColumnSize.S,
           ),
+          // Add suspension reason column for active users
+          if (!_showDeletedUsers)
+            const DataColumn2(
+              label: Text(
+                'Lý do đình chỉ',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              size: ColumnSize.M,
+            ),
           const DataColumn2(
             label: Text(
               'Hành động',
@@ -718,7 +747,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         // Created At
         DataCell(Text(DateFormat('dd/MM/yyyy').format(user.createdAt))),
 
-        // Deleted At - Add this new cell (only when showing deleted users)
+        // Deleted At (only in trash view)
         if (_showDeletedUsers)
           DataCell(
             Text(
@@ -757,48 +786,84 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
         // Status
         DataCell(
-          SizedBox(
-            height: 48,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 4,
-                      horizontal: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: user.isDeleted
-                          ? secondaryColor
-                          : user.isSuspended
-                          ? errorBackgroundColor.withValues(alpha: 0.1)
-                          : appPrimaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      user.isDeleted
-                          ? 'Đã bị xóa'
-                          : user.isSuspended
-                          ? 'Đã bị đình chỉ'
-                          : 'Đang hoạt động',
-                      style: TextStyle(
-                        color: user.isDeleted
-                            ? onPrimaryColor
-                            : user.isSuspended
-                            ? errorBackgroundColor
-                            : appPrimaryColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            decoration: BoxDecoration(
+              color: user.isDeleted
+                  ? secondaryColor
+                  : user.isSuspended
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : appPrimaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Center(
+              child: Text(
+                user.isDeleted
+                    ? 'Đã bị xóa'
+                    : user.isSuspended
+                    ? 'Đã đình chỉ'
+                    : 'Đang hoạt động',
+                style: TextStyle(
+                  color: user.isDeleted
+                      ? onPrimaryColor
+                      : user.isSuspended
+                      ? Colors.orange
+                      : appPrimaryColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
         ),
+
+        // Suspension Reason (new dedicated column for active users)
+        if (!_showDeletedUsers)
+          DataCell(
+            user.isSuspended &&
+                    user.suspensionReason != null &&
+                    user.suspensionReason!.isNotEmpty
+                ? Tooltip(
+                    message: user.suspensionReason!,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: Colors.orange,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              user.suspensionReason!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Text(
+                    '-',
+                    style: TextStyle(fontSize: 12, color: secondaryColor),
+                  ),
+          ),
 
         // Actions
         DataCell(

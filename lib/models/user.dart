@@ -12,6 +12,7 @@ class User {
   final List following;
   final bool isSuspended;
   final DateTime? suspendedAt;
+  final String? suspensionReason;
   final bool isDeleted;
   final DateTime? deletedAt;
   final String? deletionReason;
@@ -31,6 +32,7 @@ class User {
     this.isDeleted = false,
     this.deletedAt,
     this.deletionReason,
+    this.suspensionReason,
   });
 
   Map<String, dynamic> toJson() => {
@@ -54,6 +56,7 @@ class User {
         ? Timestamp.fromDate(deletedAt!)
         : null,
     "deletionReason": deletionReason,
+    "suspensionReason": suspensionReason,
   };
 
   static User fromSnap(DocumentSnapshot snapshot) {
@@ -91,6 +94,7 @@ class User {
       isDeleted: snapshotData['isDeleted'] == true, // Defaults to false if null
       deletedAt: parseDateField(snapshotData['deletedAt']),
       deletionReason: snapshotData["deletionReason"],
+      suspensionReason: snapshotData["suspensionReason"],
     );
   }
 }
