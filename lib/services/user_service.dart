@@ -176,12 +176,69 @@ class UserService {
   }
 
   // Update user profile (admin edit)
-  Future<String> updateUser(String uid, Map<String, dynamic> updates) async {
+  Future<String> updateUserProfile({
+    required String uid,
+    required String displayName,
+    String? bio,
+    DateTime? dateOfBirth,
+    Uint8List? image,
+    String? existingImageUrl,
+  }) async {
     try {
-      await _firestore.collection('users').doc(uid).update(updates);
+      String? newPhotoUrl;
+      Map<String, dynamic> updateData = {'displayName': displayName};
+
+      // Add bio if provided
+      if (bio != null && bio.isNotEmpty) {
+        updateData['bio'] = bio;
+      } else {
+        updateData['bio'] = ''; // Clear bio if empty
+      }
+
+      // Add dateOfBirth if provided
+      if (dateOfBirth != null) {
+        updateData['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+      } else {
+        updateData['dateOfBirth'] = null; // Clear date if null
+      }
+
+      // Handle profile image update
+      if (image != null) {
+        // Delete old image if exists
+        if (existingImageUrl != null && existingImageUrl.isNotEmpty) {
+          try {
+            await StorageMethods().deleteImageFromStorage(existingImageUrl);
+          } catch (e) {
+            avoidPrint('Error deleting old image: $e');
+          }
+        }
+
+        // Upload new image
+        newPhotoUrl = await StorageMethods().uploadImageToStorage(
+          'profilePics',
+          image,
+          false,
+        );
+
+        if (newPhotoUrl.isEmpty) {
+          return 'Lỗi tải ảnh lên, vui lòng thử lại';
+        }
+
+        updateData['photoUrl'] = newPhotoUrl;
+      }
+
+      // Update user document in Firestore
+      await _firestore.collection('users').doc(uid).update(updateData);
+
+      // Update all posts with new display name and profile image
+      await _updateUserPosts(uid, displayName, newPhotoUrl);
+
+      // Update all comments with new display name and profile image
+      await _updateUserComments(uid, displayName, newPhotoUrl);
+
       return 'success';
     } catch (e) {
-      avoidPrint('Error updating user: $e');
+      avoidPrint('Error updating user profile: $e');
       return 'Đã xảy ra lỗi khi cập nhật người dùng';
     }
   }
@@ -563,6 +620,102 @@ class UserService {
           await StorageMethods().deleteImageFromStorage(uploadedPhotoUrl);
         } catch (_) {}
       }
+      rethrow;
+    }
+  }
+
+  // Helper method: Update user's posts
+  Future<void> _updateUserPosts(
+    String uid,
+    String displayName,
+    String? newPhotoUrl,
+  ) async {
+    try {
+      QuerySnapshot userPostsSnapshot = await _firestore
+          .collection('posts')
+          .where('uid', isEqualTo: uid)
+          .get();
+
+      WriteBatch batch = _firestore.batch();
+      int batchCount = 0;
+
+      for (var doc in userPostsSnapshot.docs) {
+        Map<String, dynamic> updateData = {'displayName': displayName};
+
+        if (newPhotoUrl != null) {
+          updateData['profImage'] = newPhotoUrl;
+        }
+
+        batch.update(doc.reference, updateData);
+        batchCount++;
+
+        if (batchCount >= 500) {
+          await batch.commit();
+          batch = _firestore.batch();
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+
+      avoidPrint(
+        'Updated ${userPostsSnapshot.docs.length} posts for user $uid',
+      );
+    } catch (e) {
+      avoidPrint('Error updating user posts: $e');
+      rethrow;
+    }
+  }
+
+  // Helper method: Update user's comments
+  Future<void> _updateUserComments(
+    String uid,
+    String displayName,
+    String? newPhotoUrl,
+  ) async {
+    try {
+      QuerySnapshot allPostsSnapshot = await _firestore
+          .collection('posts')
+          .get();
+
+      WriteBatch batch = _firestore.batch();
+      int operationCount = 0;
+      int totalUpdated = 0;
+
+      for (var postDoc in allPostsSnapshot.docs) {
+        QuerySnapshot commentsSnapshot = await postDoc.reference
+            .collection('comments')
+            .where('uid', isEqualTo: uid)
+            .get();
+
+        for (var commentDoc in commentsSnapshot.docs) {
+          Map<String, dynamic> updateData = {'name': displayName};
+
+          if (newPhotoUrl != null) {
+            updateData['profImage'] = newPhotoUrl;
+          }
+
+          batch.update(commentDoc.reference, updateData);
+          operationCount++;
+          totalUpdated++;
+
+          if (operationCount >= 500) {
+            await batch.commit();
+            batch = _firestore.batch();
+            operationCount = 0;
+          }
+        }
+      }
+
+      if (operationCount > 0) {
+        await batch.commit();
+      }
+
+      avoidPrint('Updated $totalUpdated comments for user $uid');
+    } catch (e) {
+      avoidPrint('Error updating user comments: $e');
       rethrow;
     }
   }
