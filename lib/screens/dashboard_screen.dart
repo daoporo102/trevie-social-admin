@@ -53,7 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         avoidPrint("Đang chuẩn bị kiểm tra quyền...");
         
         // Refresh token to ensure latest claims
-        String? token = await user.getIdToken(true);
+        await user.getIdToken(true);
         avoidPrint("Token đã sẵn sàng, bắt đầu gọi Function...");
         // ---------------------------------------------
 
