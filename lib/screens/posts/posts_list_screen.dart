@@ -26,6 +26,8 @@ class _PostsListScreenState extends State<PostsListScreen> {
   bool _hasMore = true;
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isDeletingPost =
+      false; // add this state field near other booleans like _isLoading/_isLoadingMore
   int _totalPosts = 0;
 
   // Filters
@@ -164,20 +166,41 @@ class _PostsListScreenState extends State<PostsListScreen> {
 
     if (confirm != true || !mounted) return;
 
-    final result = await _postService.deletePost(post.postId);
+    setState(() {
+      _isDeletingPost = true;
+    });
 
-    if (!mounted) return;
+    try {
+      final result = await _postService.deletePost(post.postId);
 
-    if (result == 'success') {
-      displaySnackBar(
-        'Đã xóa bài viết thành công',
-        context,
-        SnackBarType.success,
-      );
-      _loadPosts(refresh: true);
-      _loadTotalCount();
-    } else {
-      displaySnackBar(result, context, SnackBarType.error);
+      if (!mounted) return;
+
+      if (result == 'success') {
+        displaySnackBar(
+          'Đã xóa bài viết thành công',
+          context,
+          SnackBarType.success,
+        );
+        // refresh list and counts
+        _loadPosts(refresh: true);
+        _loadTotalCount();
+      } else {
+        displaySnackBar(result, context, SnackBarType.error);
+      }
+    } catch (e) {
+      if (mounted) {
+        displaySnackBar(
+          'Lỗi khi xóa bài viết: $e',
+          context,
+          SnackBarType.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingPost = false;
+        });
+      }
     }
   }
 
