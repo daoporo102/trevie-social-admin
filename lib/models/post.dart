@@ -20,6 +20,7 @@ class Post {
   final String? originalPostText;
   final String? originalDisplayName;
   final String? originalProfImage;
+  final String role;
 
   const Post({
     required this.postId,
@@ -39,6 +40,7 @@ class Post {
     this.originalDisplayName,
     this.originalProfImage,
     required this.likesCount,
+    this.role = 'user',
   });
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +63,7 @@ class Post {
     "originalDisplayName": originalDisplayName,
     "originalProfImage": originalProfImage,
     "likesCount": likes.length,
+    "role": role,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -107,6 +110,7 @@ class Post {
       originalDisplayName: snapshotData['originalDisplayName'],
       originalProfImage: snapshotData['originalProfImage'],
       likesCount: snapshotData['likesCount'] ?? snapshotData['likes']?.length ?? 0,
+      role: snapshotData['role'] ?? 'user',
     );
   }
 }
