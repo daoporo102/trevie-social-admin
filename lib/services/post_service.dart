@@ -72,11 +72,7 @@ class PostService {
       };
     } catch (e) {
       avoidPrint('Error getting posts: $e');
-      return {
-        'posts': <Post>[],
-        'lastDocument': null,
-        'hasMore': false,
-      };
+      return {'posts': <Post>[], 'lastDocument': null, 'hasMore': false};
     }
   }
 
@@ -96,13 +92,14 @@ class PostService {
     try {
       // Get post document
       final postDoc = await _firestore.collection('posts').doc(postId).get();
-      
+
       if (!postDoc.exists) {
         return 'Bài viết không tồn tại';
       }
 
       final postData = postDoc.data() as Map<String, dynamic>;
       final isReshare = postData['originalPostId'] != null;
+      final String postUrl = postData['postUrl'] ?? '';
 
       // Delete all comments
       final commentsSnapshot = await _firestore
@@ -120,15 +117,23 @@ class PostService {
       batch.delete(postDoc.reference);
       await batch.commit();
 
+      // Delete image from Storage (only if it's not a reshare)
+      if (!isReshare && postUrl.isNotEmpty) {
+        try {
+          await StorageMethods().deleteImageFromStorage(postUrl);
+          avoidPrint('Deleted post image: $postUrl');
+        } catch (storageError) {
+          avoidPrint('Error deleting post image: $storageError');
+        }
+      }
+
       // Update reshare count if this is a reshare
       if (isReshare && postData['originalPostId'] != null) {
         try {
           await _firestore
               .collection('posts')
               .doc(postData['originalPostId'])
-              .update({
-            'reshareCount': FieldValue.increment(-1),
-          });
+              .update({'reshareCount': FieldValue.increment(-1)});
         } catch (e) {
           avoidPrint('Could not update reshare count: $e');
         }
@@ -140,8 +145,6 @@ class PostService {
       return 'Đã xảy ra lỗi khi xóa bài viết';
     }
   }
-
-  // ...existing code...
 
   // Create a new post (for admins)
   Future<String> createPost({
