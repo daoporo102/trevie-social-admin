@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:social_media_admin/models/post.dart';
+import 'package:social_media_admin/resources/storage_methods.dart';
 import 'package:social_media_admin/utils/utils.dart';
+import 'package:uuid/uuid.dart';
 
 enum PostSortField { datePublished, likes, reshareCount, dateUpdated }
 
@@ -134,6 +138,64 @@ class PostService {
     } catch (e) {
       avoidPrint('Error deleting post: $e');
       return 'Đã xảy ra lỗi khi xóa bài viết';
+    }
+  }
+
+  // ...existing code...
+
+  // Create a new post (for admins)
+  Future<String> createPost({
+    required String postText,
+    required Uint8List image,
+    required String uid,
+    required String displayName,
+    required String profImage,
+  }) async {
+    try {
+      // Upload image to storage
+      final photoUrl = await StorageMethods().uploadImageToStorage(
+        'posts',
+        image,
+        true,
+      );
+
+      if (photoUrl.isEmpty) {
+        return 'Lỗi tải ảnh lên, vui lòng thử lại';
+      }
+
+      // Create unique post ID
+      final postId = const Uuid().v1();
+      final now = DateTime.now();
+
+      // Create post object
+      final post = Post(
+        postId: postId,
+        uid: uid,
+        postText: postText,
+        displayName: displayName,
+        postUrl: photoUrl,
+        profImage: profImage,
+        datePublished: now,
+        likes: [],
+        dateUpdated: null,
+        lastDateModified: now,
+        reshareCount: 0,
+        originalPostId: null,
+        originalUid: null,
+        originalPostText: null,
+        originalDisplayName: null,
+        originalProfImage: null,
+        likesCount: 0,
+        role: 'admin',
+      );
+
+      // Save to Firestore
+      await _firestore.collection('posts').doc(postId).set(post.toJson());
+
+      return 'success';
+    } catch (e) {
+      avoidPrint('Error creating post: $e');
+      return 'Đã xảy ra lỗi khi tạo bài viết';
     }
   }
 }

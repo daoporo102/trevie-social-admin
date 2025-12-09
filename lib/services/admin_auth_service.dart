@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:social_media_admin/utils/utils.dart';
 
@@ -72,6 +73,9 @@ class AdminAuthService {
         return 'Tài khoản này không có quyền truy cập quản trị';
       }
 
+      // Ensure user document exists in Firestore
+      await ensureUserDocumentExists();
+
       return 'success';
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
@@ -123,5 +127,52 @@ class AdminAuthService {
       'isAdmin': idTokenResult.claims?['admin'] == true,
       'isSuperAdmin': idTokenResult.claims?['superAdmin'] == true,
     };
+  }
+
+   /// Create user document in Firestore if it doesn't exist
+  Future<String> ensureUserDocumentExists() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return 'Người dùng chưa đăng nhập';
+
+      // Check if user document exists
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        // Create user document
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'uid': user.uid,
+          'email': user.email ?? '',
+          'displayName': user.displayName ?? 'Admin',
+          'photoUrl': user.photoURL ?? '',
+          'bio': '',
+          'dateOfBirth': null,
+          'createdAt': Timestamp.now(),
+          'followers': [],
+          'following': [],
+          'isSuspended': false,
+          'suspendedAt': null,
+          'isDeleted': false,
+          'deletedAt': null,
+          'deletionReason': null,
+          'suspensionReason': null,
+          'role': 'admin',
+        });
+        
+        avoidPrint('Created user document for admin: ${user.email}');
+        return 'success';
+      }
+
+      return 'success';
+    } catch (e) {
+      avoidPrint('Error ensuring user document: $e');
+      return 'Đã xảy ra lỗi khi tạo tài liệu người dùng';
+    }
   }
 }

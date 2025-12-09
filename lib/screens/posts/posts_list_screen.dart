@@ -7,6 +7,7 @@ import 'package:social_media_admin/services/post_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
+import 'package:social_media_admin/widgets/create_post_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 
 class PostsListScreen extends StatefulWidget {
@@ -180,6 +181,19 @@ class _PostsListScreenState extends State<PostsListScreen> {
     }
   }
 
+  Future<void> _showCreatePostDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CreatePostDialog(
+        onPostCreated: () {
+          _loadPosts(refresh: true);
+          _loadTotalCount();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -188,7 +202,13 @@ class _PostsListScreenState extends State<PostsListScreen> {
         title: Text('Quản lý bài viết ($_totalPosts)'),
         backgroundColor: webBackgroundColor,
         foregroundColor: primaryTextColor,
+        // Add Create Post Button
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showCreatePostDialog,
+            tooltip: 'Tạo bài viết mới',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
