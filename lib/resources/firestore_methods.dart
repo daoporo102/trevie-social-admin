@@ -73,6 +73,7 @@ class FirestoreMethod {
         originalPostText: null,
         originalDisplayName: null,
         originalProfImage: null,
+        likesCount: 0,
       );
 
       _firestore.collection('posts').doc(postId).set(post.toJson());
@@ -168,11 +169,13 @@ class FirestoreMethod {
         //unlike the post
         await _firestore.collection('posts').doc(postId).update({
           'likes': FieldValue.arrayRemove([uid]),
+          'likesCount': FieldValue.increment(-1),
         });
       } else {
         //like the post
         await _firestore.collection('posts').doc(postId).update({
           'likes': FieldValue.arrayUnion([uid]),
+          'likesCount': FieldValue.increment(1),
         });
       }
     } on FirebaseException catch (e) {
@@ -455,6 +458,7 @@ class FirestoreMethod {
         originalPostText: originalPost.postText,
         originalDisplayName: originalPost.displayName,
         originalProfImage: originalPost.profImage,
+        likesCount: 0,
       );
 
       // Reference to the original post
