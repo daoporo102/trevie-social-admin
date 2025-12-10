@@ -1,10 +1,15 @@
-/**
+/*
  * Region: asia-southeast1 (Singapore)
+ * to run: firebase deploy --only functions
  */
-
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {setGlobalOptions} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const axios = require("axios");
+
+// AI Server URL
+const AI_SERVER_URL = "https://peripherally-subovoid-doug.ngrok-free.dev/predict";
 
 // Initialize Admin SDK
 admin.initializeApp();
@@ -38,7 +43,7 @@ exports.setAdminClaim = onCall(async (request) => {
   }
 
   try {
-    // Get user by email 
+    // Get user by email
     const user = await admin.auth().getUserByEmail(email);
     // Set custom user claims to make the user an admin
     await admin.auth().setCustomUserClaims(user.uid, {admin: true});
@@ -259,5 +264,63 @@ exports.deleteUserAuth = onCall(async (request) => {
     return {success: true, message: "User deleted from Auth"};
   } catch (error) {
     throw new HttpsError("internal", error.message);
+  }
+});
+
+
+/**
+ * 7. AI Post's Text Check
+ */
+exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
+  const snapshot = event.data;
+  const postId = event.params.postId;
+
+  // if no snapshot, exit
+  if (!snapshot) {
+    return;
+  }
+
+  // get post data
+  const postData = snapshot.data();
+  // get post text
+  const text = postData.postText || "";
+
+  // if no text, set status to active
+  if (!text) {
+    return snapshot.ref.update({status: "active", moderatedBy: "AI", moderatedAt: admin.firestore.Timestamp.now()});
+  }
+
+  try {
+    console.log(`Đang gửi bài ${postId} tới AI Server...`);
+    // call AI server
+    const response = await axios.post(AI_SERVER_URL, {
+      text: text,
+    });
+    // get AI result
+    const aiResult = response.data;
+    // process AI result
+    if (aiResult.is_toxic === true) {
+      // if toxic, set status to rejected with reason
+      await snapshot.ref.update({
+        status: "rejected",
+        aiReason: aiResult.reason,
+        moderatedBy: "AI",
+        moderatedAt: admin.firestore.Timestamp.now(),
+      });
+      console.log(`Đã chặn bài ${postId}: ${aiResult.reason}`);
+    } else {
+      // if not toxic, set status to active
+      await snapshot.ref.update({
+        status: "active",
+        aiReason: null,
+        moderatedBy: "AI",
+        moderatedAt: admin.firestore.Timestamp.now(),
+      });
+      console.log(`Bài viết ${postId} an toàn.`);
+    }
+  } catch (error) {
+    console.error("Lỗi gọi AI Server:", error.message);
+    // On error, set status to pending_review
+    await snapshot.ref.update({status: "pending_review"});
   }
 });
