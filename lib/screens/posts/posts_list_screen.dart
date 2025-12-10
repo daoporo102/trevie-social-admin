@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:social_media_admin/models/post.dart';
@@ -9,6 +10,7 @@ import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/create_post_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
+import 'package:social_media_admin/widgets/reject_post_dialog.dart';
 
 class PostsListScreen extends StatefulWidget {
   const PostsListScreen({super.key});
@@ -36,6 +38,9 @@ class _PostsListScreenState extends State<PostsListScreen> {
   PostSortField _sortBy = PostSortField.datePublished;
   bool _ascending = false;
   String _searchQuery = '';
+
+  // Add this new state variable
+  String? _selectedStatus;
 
   @override
   void initState() {
@@ -71,6 +76,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
         endDate: _endDate,
         sortBy: _sortBy,
         ascending: _ascending,
+        status: _selectedStatus,
       );
 
       if (!mounted) return;
@@ -136,6 +142,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
       _sortBy = PostSortField.datePublished;
       _ascending = false;
       _searchQuery = '';
+      _selectedStatus = null; // Add this line
       _searchController.clear();
     });
     _loadPosts(refresh: true);
@@ -317,9 +324,50 @@ class _PostsListScreenState extends State<PostsListScreen> {
           const SizedBox(height: 12.0),
 
           // Filters Row
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.start,
             children: [
-              const SizedBox(width: 16.0),
+              // Status Filter
+              SizedBox(
+                width: 200,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedStatus,
+                  decoration: InputDecoration(
+                    labelText: 'Trạng thái',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: null,
+                      child: Text('Tất cả trạng thái'),
+                    ),
+                    DropdownMenuItem(value: 'active', child: Text('Đã duyệt')),
+                    DropdownMenuItem(
+                      value: 'rejected',
+                      child: Text('Bị từ chối'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'processing',
+                      child: Text('Đang xử lý'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedStatus = value;
+                    });
+                    _applyFilters();
+                  },
+                ),
+              ),
+
               // Sort By
               DropdownButton<PostSortField>(
                 value: _sortBy,
@@ -351,7 +399,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                 ],
                 hint: const Text('Sắp xếp theo'),
               ),
-              const SizedBox(width: 16.0),
+
               // Sort Order
               Container(
                 decoration: BoxDecoration(
@@ -408,7 +456,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
       child: DataTable2(
         columnSpacing: 12,
         horizontalMargin: 12,
-        minWidth: 1000,
+        minWidth: 1200, // Increased width to accommodate new columns
         dataRowHeight: 80,
         headingRowHeight: 56,
         columns: const [
@@ -432,6 +480,13 @@ class _PostsListScreenState extends State<PostsListScreen> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             size: ColumnSize.S,
+          ),
+          DataColumn2(
+            label: Text(
+              'Trạng thái',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            size: ColumnSize.M,
           ),
           DataColumn2(
             label: Text(
@@ -494,6 +549,8 @@ class _PostsListScreenState extends State<PostsListScreen> {
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
+                const DataCell(SizedBox()),
+                const DataCell(SizedBox()),
               ],
             ),
         ],
@@ -503,6 +560,38 @@ class _PostsListScreenState extends State<PostsListScreen> {
 
   DataRow2 _buildDataRow(Post post) {
     final isReshare = post.originalPostId != null;
+
+    // Determine status color and text
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+
+    switch (post.status) {
+      case 'active':
+        statusColor = appPrimaryColor;
+        statusText = 'Đã duyệt';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'rejected':
+        statusColor = errorBackgroundColor;
+        statusText = 'Bị từ chối';
+        statusIcon = Icons.cancel;
+        break;
+      case 'processing':
+        statusColor = Colors.orange;
+        statusText = 'Đang xử lý';
+        statusIcon = Icons.hourglass_empty;
+        break;
+      case 'pending_review':
+        statusColor = infoBackgroundColor;
+        statusText = 'Chờ duyệt';
+        statusIcon = Icons.pending;
+        break;
+      default:
+        statusColor = secondaryColor;
+        statusText = 'Không rõ';
+        statusIcon = Icons.help_outline;
+    }
 
     return DataRow2(
       cells: [
@@ -580,6 +669,124 @@ class _PostsListScreenState extends State<PostsListScreen> {
               : Icon(Icons.image_not_supported, color: secondaryColor),
         ),
 
+        // Status Column - ALTERNATIVE CENTERED VERSION
+        DataCell(
+          Container(
+            alignment: Alignment.center, // This centers everything
+            height: 80,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Status Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 14, color: statusColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Admin Reason
+                  if (post.status == 'rejected' &&
+                      post.adminReason != null &&
+                      post.adminReason!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Tooltip(
+                        message: 'Admin: ${post.adminReason!}',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.admin_panel_settings,
+                              size: 12,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                post.adminReason!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // AI Reason
+                  if (post.status == 'rejected' &&
+                      post.aiReason != null &&
+                      post.aiReason!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Tooltip(
+                        message: 'AI: ${post.aiReason!}',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.smart_toy,
+                              size: 12,
+                              color: infoBackgroundColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                post.aiReason!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: infoBackgroundColor,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+
         // Date Published
         DataCell(
           Text(
@@ -636,6 +843,24 @@ class _PostsListScreenState extends State<PostsListScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Approve button (only for rejected/pending posts)
+              if (post.status == 'rejected' || post.status == 'pending_review')
+                IconButton(
+                  icon: const Icon(Icons.check_circle, size: 20),
+                  tooltip: 'Duyệt bài viết',
+                  color: appPrimaryColor,
+                  onPressed: () => _approvePost(post),
+                ),
+              // Reject button (only for active/pending/processing posts)
+              if (post.status == 'active' ||
+                  post.status == 'pending_review' ||
+                  post.status == 'processing')
+                IconButton(
+                  icon: const Icon(Icons.block, size: 20),
+                  tooltip: 'Từ chối bài viết',
+                  color: Colors.orange,
+                  onPressed: () => _rejectPost(post),
+                ),
               // Delete button
               IconButton(
                 icon: const Icon(Icons.delete, size: 20),
@@ -648,5 +873,219 @@ class _PostsListScreenState extends State<PostsListScreen> {
         ),
       ],
     );
+  }
+
+  // Add this new method to approve posts
+  Future<void> _approvePost(Post post) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận duyệt bài viết'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Bạn có chắc chắn muốn duyệt bài viết này?\n\n'
+              'Bài viết sẽ hiển thị công khai trên ứng dụng.',
+            ),
+            const SizedBox(height: 16),
+            // Show warning if overriding Admin decision
+            if (post.adminReason != null && post.adminReason!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ghi đè quyết định của Admin',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange.shade800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Admin đã từ chối vì: ${post.adminReason}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            // Show warning if overriding AI decision
+            if (post.aiReason != null && post.aiReason!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: infoBackgroundColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: infoBackgroundColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: infoBackgroundColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ghi đè quyết định của AI',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: infoBackgroundColor,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'AI đã từ chối vì: ${post.aiReason}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: infoBackgroundColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: appPrimaryColor,
+              foregroundColor: onPrimaryColor,
+            ),
+            child: const Text('Duyệt'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    try {
+      // Update post status to active with admin moderation
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.postId)
+          .update({
+            'status': 'active',
+            'adminReason': null, // Clear any previous admin reason
+            'moderatedBy': 'admin', // Mark as admin-approved
+            'moderatedAt': FieldValue.serverTimestamp(),
+          });
+
+      if (!mounted) return;
+
+      displaySnackBar(
+        'Đã duyệt bài viết thành công',
+        context,
+        SnackBarType.success,
+      );
+
+      // Refresh the list
+      _loadPosts(refresh: true);
+    } catch (e) {
+      if (mounted) {
+        displaySnackBar(
+          'Lỗi khi duyệt bài viết: $e',
+          context,
+          SnackBarType.error,
+        );
+      }
+    }
+  }
+
+  // Update the reject post method
+  Future<void> _rejectPost(Post post) async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => RejectPostDialog(
+        post: post,
+        isOverridingAI: post.status == 'active' && post.moderatedBy == 'AI',
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    final reason = result['reason'];
+    if (reason == null || reason.isEmpty) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final adminEmail = user?.email ?? 'Unknown Admin';
+
+      // Update post status to rejected with admin reason
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.postId)
+          .update({
+            'status': 'rejected',
+            'adminReason': reason, // Set admin reason
+            'moderatedBy': 'admin', // Mark as admin-moderated
+            'moderatedByAdminEmail': adminEmail,
+            'moderatedAt': FieldValue.serverTimestamp(),
+            // Keep AI reason if it exists for reference
+          });
+
+      if (!mounted) return;
+
+      displaySnackBar(
+        'Đã từ chối bài viết thành công',
+        context,
+        SnackBarType.success,
+      );
+
+      // Refresh the list
+      _loadPosts(refresh: true);
+    } catch (e) {
+      if (mounted) {
+        displaySnackBar(
+          'Lỗi khi từ chối bài viết: $e',
+          context,
+          SnackBarType.error,
+        );
+      }
+    }
   }
 }

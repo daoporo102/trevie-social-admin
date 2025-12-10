@@ -20,9 +20,15 @@ class PostService {
     DateTime? endDate,
     PostSortField sortBy = PostSortField.datePublished,
     bool ascending = false,
+    String? status, // Add this parameter
   }) async {
     try {
       Query query = _firestore.collection('posts');
+
+      // Add status filter if provided
+      if (status != null && status.isNotEmpty) {
+        query = query.where('status', isEqualTo: status);
+      }
 
       // Apply sorting
       String sortField = 'datePublished';
@@ -56,7 +62,7 @@ class PostService {
           .map((doc) => Post.fromSnap(doc))
           .toList();
 
-      // Apply search filter in memory (Firestore doesn't support full-text search)
+      // Apply search filter in memory
       if (searchQuery != null && searchQuery.isNotEmpty) {
         posts = posts.where((post) {
           final searchLower = searchQuery.toLowerCase();
@@ -190,6 +196,8 @@ class PostService {
         originalProfImage: null,
         likesCount: 0,
         role: 'admin',
+        status: 'processing',
+        aiReason: null,
       );
 
       // Save to Firestore

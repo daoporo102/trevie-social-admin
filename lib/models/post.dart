@@ -21,6 +21,12 @@ class Post {
   final String? originalDisplayName;
   final String? originalProfImage;
   final String role;
+  final String status;
+  final String? aiReason;
+  final String? adminReason;
+  final String? moderatedBy;
+  final DateTime? moderatedAt;
+
 
   const Post({
     required this.postId,
@@ -41,6 +47,11 @@ class Post {
     this.originalProfImage,
     required this.likesCount,
     this.role = 'user',
+    required this.status,
+    this.aiReason,
+    this.adminReason,
+    this.moderatedBy,
+    this.moderatedAt
   });
 
   Map<String, dynamic> toJson() => {
@@ -64,6 +75,13 @@ class Post {
     "originalProfImage": originalProfImage,
     "likesCount": likes.length,
     "role": role,
+    "status": status,
+    "aiReason": aiReason,
+    "adminReason": adminReason,
+    "moderatedBy": moderatedBy,
+    "moderatedAt": moderatedAt != null
+        ? Timestamp.fromDate(moderatedAt!)
+        : null,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -109,8 +127,14 @@ class Post {
       originalPostText: snapshotData['originalPostText'],
       originalDisplayName: snapshotData['originalDisplayName'],
       originalProfImage: snapshotData['originalProfImage'],
-      likesCount: snapshotData['likesCount'] ?? snapshotData['likes']?.length ?? 0,
+      likesCount:
+          snapshotData['likesCount'] ?? snapshotData['likes']?.length ?? 0,
       role: snapshotData['role'] ?? 'user',
+      status: snapshotData['status'] ?? 'active',
+      aiReason: snapshotData['aiReason'],
+      adminReason: snapshotData['adminReason'],
+      moderatedBy: snapshotData['moderatedBy'],
+      moderatedAt: parseDateField(snapshotData['moderatedAt']),
     );
   }
 }

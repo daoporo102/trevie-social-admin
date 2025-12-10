@@ -1,55 +1,61 @@
-/**
- * index.js - Viết lại chuẩn Cloud Functions v2
+/*
  * Region: asia-southeast1 (Singapore)
+ * to run: firebase deploy --only functions
  */
-
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {setGlobalOptions} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const axios = require("axios");
 
-// Khởi tạo Admin SDK
+// AI Server URL
+const AI_SERVER_URL = "https://peripherally-subovoid-doug.ngrok-free.dev/predict";
+
+// Initialize Admin SDK
 admin.initializeApp();
 
-// CẤU HÌNH CHUNG: Ép toàn bộ functions chạy ở Singapore
+// Set global options for all functions
 setGlobalOptions({region: "asia-southeast1", maxInstances: 10});
 
 /**
  * 1. Set Admin Claim
  */
 exports.setAdminClaim = onCall(async (request) => {
-  // Trong v2: data và auth nằm trong biến 'request'
+  // Extract data and auth from the request
   const {data, auth} = request;
 
-  // Check đăng nhập
+  // Check if the user is authenticated
   if (!auth) {
     throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
   }
 
-  // Check quyền (Admin hoặc SuperAdmin mới được tạo Admin khác)
+  // Check if the user has admin or superAdmin privileges
   if (!auth.token.admin && !auth.token.superAdmin) {
     throw new HttpsError("permission-denied", "Chỉ quản trị viên mới có thể tạo quản trị viên khác");
   }
 
+  // Extract email from the data
   const {email} = data;
 
+  // check if email is provided and valid
   if (!email || typeof email !== "string") {
     throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
   }
 
   try {
+    // Get user by email
     const user = await admin.auth().getUserByEmail(email);
-
-    // Set admin: true
+    // Set custom user claims to make the user an admin
     await admin.auth().setCustomUserClaims(user.uid, {admin: true});
-
     console.log(`Admin claim set for user ${email} (UID: ${user.uid})`);
-
+    // Return success response
     return {
       success: true,
       message: `Quyền quản trị viên đã được cấp cho ${email}`,
       uid: user.uid,
     };
   } catch (error) {
+    // Handle errors
     console.error("Error setting admin claim:", error);
     throw new HttpsError("internal", `Không thể thiết lập quyền: ${error.message}`);
   }
@@ -59,31 +65,33 @@ exports.setAdminClaim = onCall(async (request) => {
  * 2. Remove Admin Claim
  */
 exports.removeAdminClaim = onCall(async (request) => {
+  // Extract data and auth from the request
   const {data, auth} = request;
 
+  // Check if the user is authenticated
   if (!auth) {
     throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
   }
 
-  // Chỉ Super Admin mới được xóa quyền
+  // Check if the user has superAdmin privileges
   if (!auth.token.superAdmin) {
     throw new HttpsError("permission-denied", "Chỉ super admin mới có thể xóa quyền quản trị viên");
   }
 
+  // Extract email from the data
   const {email} = data;
-
+  // check if email is provided and valid
   if (!email || typeof email !== "string") {
     throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
   }
 
   try {
+    // Get user by email
     const user = await admin.auth().getUserByEmail(email);
-
-    // Set admin: false (xóa quyền)
+    // Remove admin claim
     await admin.auth().setCustomUserClaims(user.uid, {admin: false});
-
     console.log(`Admin claim removed for user ${email} (UID: ${user.uid})`);
-
+    // Return success response
     return {
       success: true,
       message: `Đã xóa quyền quản trị viên của ${email}`,
@@ -99,25 +107,29 @@ exports.removeAdminClaim = onCall(async (request) => {
  * 3. Check Admin Status
  */
 exports.checkAdminStatus = onCall(async (request) => {
+  // Extract data and auth from the request
   const {data, auth} = request;
-
+  // Check if the user is authenticated
   if (!auth) {
     throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
   }
-
+  // Extract email from the data
   const {email} = data;
 
   try {
-    // Nếu không gửi email lên thì lấy email của người đang gọi
+    // Get user by email (or use auth email if not provided)
     const emailToCheck = email || auth.token.email;
-
+    // Fetch user and their custom claims
     const user = await admin.auth().getUserByEmail(emailToCheck);
+    // Get user record to access custom claims
     const userRecord = await admin.auth().getUser(user.uid);
+    // Extract custom claims
     const customClaims = userRecord.customClaims || {};
 
     console.log(`Kiểm tra quyền cho: ${emailToCheck}`);
     console.log(`Claims hiện tại:`, JSON.stringify(customClaims));
 
+    // Return admin status
     return {
       isAdmin: customClaims.admin === true,
       isSuperAdmin: customClaims.superAdmin === true,
@@ -133,31 +145,30 @@ exports.checkAdminStatus = onCall(async (request) => {
  * 4. Set Super Admin Claim (Dùng Secret Key)
  */
 exports.setSuperAdminClaim = onCall(async (request) => {
-  const {data} = request; // Không bắt buộc auth vì dùng secret key
+  // Extract data from the request
+  const {data} = request;
   const {email, secretKey} = data;
-
-  // Secret key mặc định (Bạn nên đổi cái này hoặc dùng .env)
   const expectedSecret = "my_default_secret_key";
 
+  // Validate secret key
   if (secretKey !== expectedSecret) {
     throw new HttpsError("permission-denied", "Secret key không hợp lệ");
   }
-
+  // Validate email
   if (!email || typeof email !== "string") {
     throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
   }
 
   try {
+    // Get user by email
     const user = await admin.auth().getUserByEmail(email);
-
-    // Cấp cả Admin và SuperAdmin
+    // Set super admin claim
     await admin.auth().setCustomUserClaims(user.uid, {
       admin: true,
       superAdmin: true,
     });
-
     console.log(`Super admin claim set for user ${email} (UID: ${user.uid})`);
-
+    // Return success response
     return {
       success: true,
       message: `Đã cấp quyền super admin cho ${email}`,
@@ -173,42 +184,39 @@ exports.setSuperAdminClaim = onCall(async (request) => {
  * 5. Create User (Only Super Admin)
  */
 exports.createUser = onCall(async (request) => {
+  // Extract data and auth from the request
   const {data, auth} = request;
-
+  // Check if the user is authenticated
   if (!auth) {
     throw new HttpsError("permission-denied", "Bạn phải đăng nhập để thực hiện hành động này");
   }
-
-  // Chỉ Super Admin mới được tạo user
+  // Check if the user has superAdmin privileges
   if (!auth.token.superAdmin) {
     throw new HttpsError("permission-denied", "Chỉ super admin mới có thể tạo người dùng mới");
   }
-
+  // Extract user details from the data
   const {email, password, displayName, bio, dateOfBirth, photoUrl} = data;
-
-  // Validation
+  // Validate input
   if (!email || typeof email !== "string") throw new HttpsError("invalid-argument", "Địa chỉ email không hợp lệ");
   if (!password || password.length < 6) throw new HttpsError("invalid-argument", "Mật khẩu phải có ít nhất 6 ký tự");
   if (!displayName) throw new HttpsError("invalid-argument", "Tên hiển thị không được để trống");
   if (!photoUrl) throw new HttpsError("invalid-argument", "Ảnh đại diện là bắt buộc");
 
   try {
-    // Tạo user bên Auth
+    // Create user in Firebase Auth
     const userRecord = await admin.auth().createUser({
       email: email,
       password: password,
       displayName: displayName,
       photoURL: photoUrl,
     });
-
-    // Tạo user bên Firestore
+    // Prepare user document for Firestore
     const userDoc = {
       uid: userRecord.uid,
       displayName: displayName,
       email: email,
       photoUrl: photoUrl,
       bio: bio || "",
-      // Chuyển đổi ngày tháng
       dateOfBirth: dateOfBirth ? admin.firestore.Timestamp.fromDate(new Date(dateOfBirth)) : null,
       createdAt: admin.firestore.Timestamp.now(),
       followers: [],
@@ -217,14 +225,14 @@ exports.createUser = onCall(async (request) => {
       suspendedAt: null,
       isDeleted: false,
     };
-
+    // Save user document to Firestore
     await admin.firestore()
         .collection("users")
         .doc(userRecord.uid)
         .set(userDoc);
 
     console.log(`User created: ${email} by super admin ${auth.token.email}`);
-
+    // Return success response
     return {
       success: true,
       message: `Đã tạo người dùng thành công: ${email}`,
@@ -233,30 +241,86 @@ exports.createUser = onCall(async (request) => {
     };
   } catch (error) {
     console.error("Error creating user:", error);
-
     if (error.code === "auth/email-already-exists") {
       throw new HttpsError("already-exists", "Email đã được sử dụng");
     }
-
     throw new HttpsError("internal", `Không thể tạo người dùng: ${error.message}`);
   }
 });
 
-/** 6. Hard Delete User
+/** * 6. Hard Delete User
  */
 exports.deleteUserAuth = onCall(async (request) => {
+  // Extract data and auth from the request
   const {data, auth} = request;
-
+  // Check if the user is authenticated
   if (!auth || !auth.token.superAdmin) {
     throw new HttpsError("permission-denied", "Only super admin can delete users");
   }
-
   const {uid} = data;
-
   try {
+    // Delete user from Firebase Auth
     await admin.auth().deleteUser(uid);
     return {success: true, message: "User deleted from Auth"};
   } catch (error) {
     throw new HttpsError("internal", error.message);
+  }
+});
+
+
+/**
+ * 7. AI Post's Text Check
+ */
+exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
+  const snapshot = event.data;
+  const postId = event.params.postId;
+
+  // if no snapshot, exit
+  if (!snapshot) {
+    return;
+  }
+
+  // get post data
+  const postData = snapshot.data();
+  // get post text
+  const text = postData.postText || "";
+
+  // if no text, set status to active
+  if (!text) {
+    return snapshot.ref.update({status: "active", moderatedBy: "AI", moderatedAt: admin.firestore.Timestamp.now()});
+  }
+
+  try {
+    console.log(`Đang gửi bài ${postId} tới AI Server...`);
+    // call AI server
+    const response = await axios.post(AI_SERVER_URL, {
+      text: text,
+    });
+    // get AI result
+    const aiResult = response.data;
+    // process AI result
+    if (aiResult.is_toxic === true) {
+      // if toxic, set status to rejected with reason
+      await snapshot.ref.update({
+        status: "rejected",
+        aiReason: aiResult.reason,
+        moderatedBy: "AI",
+        moderatedAt: admin.firestore.Timestamp.now(),
+      });
+      console.log(`Đã chặn bài ${postId}: ${aiResult.reason}`);
+    } else {
+      // if not toxic, set status to active
+      await snapshot.ref.update({
+        status: "active",
+        aiReason: null,
+        moderatedBy: "AI",
+        moderatedAt: admin.firestore.Timestamp.now(),
+      });
+      console.log(`Bài viết ${postId} an toàn.`);
+    }
+  } catch (error) {
+    console.error("Lỗi gọi AI Server:", error.message);
+    // On error, set status to pending_review
+    await snapshot.ref.update({status: "pending_review"});
   }
 });
