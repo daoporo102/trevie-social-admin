@@ -299,10 +299,10 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
 
   try {
     console.log(`Đang gửi bài ${postId} tới AI Server...`);
-    // call AI server with timeout of 5 seconds
+    // call AI server with timeout of 10 seconds
     const response = await axios.post(AI_SERVER_URL, {
       text: text,
-    }, {timeout: 5000});
+    }, {timeout: 10000});
 
     // end time
     const endTime = Date.now();
