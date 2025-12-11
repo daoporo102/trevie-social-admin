@@ -1,6 +1,9 @@
 /*
  * Region: asia-southeast1 (Singapore)
- * to run: firebase deploy --only functions
+ * to run:
+ *    step 1: npm run lint -- --fix
+ *    step 2: firebase deploy --only functions
+ *    see log: firebase functions:log
  */
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {setGlobalOptions} = require("firebase-functions/v2");
@@ -287,15 +290,28 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
 
   // if no text, set status to active
   if (!text) {
-    return snapshot.ref.update({status: "active", moderatedBy: "AI", moderatedAt: admin.firestore.Timestamp.now()});
+    return snapshot.ref.update({status: "active"});
   }
+
+  // start time
+  const startTime = Date.now();
+  console.log(`[START] Bắt đầu gửi bài ${postId} tới AI...`);
 
   try {
     console.log(`Đang gửi bài ${postId} tới AI Server...`);
-    // call AI server
+    // call AI server with timeout of 5 seconds
     const response = await axios.post(AI_SERVER_URL, {
       text: text,
-    });
+    }, {timeout: 5000});
+
+    // end time
+    const endTime = Date.now();
+    // Calculate execution time
+    const executionTime = endTime - startTime;
+
+    // Print the log (You will see this in the Console). measured in milliseconds
+    console.log(`[PERFORMANCE] AI phản hồi trong: ${executionTime}ms`);
+
     // get AI result
     const aiResult = response.data;
     // process AI result
@@ -307,7 +323,7 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
         moderatedBy: "AI",
         moderatedAt: admin.firestore.Timestamp.now(),
       });
-      console.log(`Đã chặn bài ${postId}: ${aiResult.reason}`);
+      console.log(`AI chặn bài ${postId} vì: ${aiResult.reason} (mất ${executionTime}ms)`);
     } else {
       // if not toxic, set status to active
       await snapshot.ref.update({
@@ -316,11 +332,21 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
         moderatedBy: "AI",
         moderatedAt: admin.firestore.Timestamp.now(),
       });
-      console.log(`Bài viết ${postId} an toàn.`);
+      console.log(`AI duyệt sạch (mất ${executionTime}ms)`);
     }
   } catch (error) {
-    console.error("Lỗi gọi AI Server:", error.message);
-    // On error, set status to pending_review
-    await snapshot.ref.update({status: "pending_review"});
+    // Measure the time even if there is an error (to know how long it takes to die)
+    // for example, if it takes exactly 5000ms, it's due to a timeout).
+    const errorTime = Date.now() - startTime;
+    console.error(`[ERROR] Lỗi gọi AI Server sau ${errorTime}ms:`, error.message);
+
+    // On error, Auto-Approve the post to avoid pending content for users
+    await snapshot.ref.update({
+      status: "active",
+      moderatedBy: "system_failover",
+      aiReason: "Dich vụ AI lỗi -> tự động duyệt",
+      moderatedAt: admin.firestore.Timestamp.now(),
+    });
+    console.log(` Đã Auto-Approve bài viết do lỗi.`);
   }
 });
