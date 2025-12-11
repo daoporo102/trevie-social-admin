@@ -461,11 +461,15 @@ class _PostsListScreenState extends State<PostsListScreen> {
         headingRowHeight: 56,
         columns: const [
           DataColumn2(
+            label: Text('Uid', style: TextStyle(fontWeight: FontWeight.bold)),
+            size: ColumnSize.S,
+          ),
+          DataColumn2(
             label: Text(
               'Người đăng',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.L,
           ),
           DataColumn2(
             label: Text(
@@ -493,14 +497,20 @@ class _PostsListScreenState extends State<PostsListScreen> {
               'Ngày đăng',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.S,
           ),
           DataColumn2(
-            label: Text(
-              'Ngày chỉnh sửa',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            label: Tooltip(
+              message: 'Ngày chỉnh sửa',
+              child: Text(
+                'Ngày chỉnh sửa',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.S,
           ),
           DataColumn2(
             label: Text(
@@ -521,7 +531,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
               'Hành động',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.S,
           ),
         ],
         rows: [
@@ -543,6 +553,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                           ),
                   ),
                 ),
+                const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
                 const DataCell(SizedBox()),
@@ -599,6 +610,17 @@ class _PostsListScreenState extends State<PostsListScreen> {
 
     return DataRow2(
       cells: [
+        // Uid
+        DataCell(
+          Text(
+            post.uid,
+            style: const TextStyle(
+              fontSize: 13,
+              overflow: TextOverflow.ellipsis,
+            ),
+            maxLines: 4,
+          ),
+        ),
         // User Info
         DataCell(
           Row(
