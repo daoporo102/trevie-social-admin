@@ -561,6 +561,10 @@ class _PostsListScreenState extends State<PostsListScreen> {
   DataRow2 _buildDataRow(Post post) {
     final isReshare = post.originalPostId != null;
 
+    // Check logic fail-over
+    final isSystemFailover =
+        post.status == 'active' && post.moderatedBy == 'system_failover';
+
     // Determine status color and text
     Color statusColor;
     String statusText;
@@ -669,16 +673,16 @@ class _PostsListScreenState extends State<PostsListScreen> {
               : Icon(Icons.image_not_supported, color: secondaryColor),
         ),
 
-        // Status Column - ALTERNATIVE CENTERED VERSION
+        // Status Column
         DataCell(
           Container(
-            alignment: Alignment.center, // This centers everything
+            alignment: Alignment.center,
             height: 80,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Status Badge
+                  // 1. Status Badge
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -708,6 +712,50 @@ class _PostsListScreenState extends State<PostsListScreen> {
                     ),
                   ),
 
+                  // check AI system failover in approve post
+                  if (isSystemFailover) ...[
+                    const SizedBox(height: 4),
+                    Tooltip(
+                      message:
+                          post.aiReason ??
+                          'Hệ thống tự động duyệt do AI mất kết nối',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cloud_off, // Icon thể hiện mất kết nối
+                              size: 12,
+                              color: Colors.orange.shade800,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Lỗi AI (Tự duyệt)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.orange.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
                   // Admin Reason
                   if (post.status == 'rejected' &&
                       post.adminReason != null &&
@@ -723,7 +771,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                             Icon(
                               Icons.admin_panel_settings,
                               size: 12,
-                              color: Colors.orange,
+                              color: errorBackgroundColor,
                             ),
                             const SizedBox(width: 4),
                             Flexible(
@@ -731,7 +779,9 @@ class _PostsListScreenState extends State<PostsListScreen> {
                                 post.adminReason!,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.orange.shade700,
+                                  color: errorBackgroundColor.withValues(
+                                    alpha: 0.7,
+                                  ),
                                   fontWeight: FontWeight.w600,
                                 ),
                                 maxLines: 2,
@@ -745,7 +795,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                     ),
                   ],
 
-                  // AI Reason
+                  // 4. AI Reason
                   if (post.status == 'rejected' &&
                       post.aiReason != null &&
                       post.aiReason!.isNotEmpty) ...[
@@ -760,7 +810,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                             Icon(
                               Icons.smart_toy,
                               size: 12,
-                              color: infoBackgroundColor,
+                              color: Colors.orange,
                             ),
                             const SizedBox(width: 4),
                             Flexible(
@@ -768,7 +818,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                                 post.aiReason!,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: infoBackgroundColor,
+                                  color: Colors.orange.withValues(alpha: 0.7),
                                   fontStyle: FontStyle.italic,
                                 ),
                                 maxLines: 2,
@@ -895,6 +945,54 @@ class _PostsListScreenState extends State<PostsListScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
+                  color: errorBackgroundColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: errorBackgroundColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: errorBackgroundColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ghi đè quyết định của Admin',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: errorBackgroundColor,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Admin đã từ chối vì: ${post.adminReason}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: errorBackgroundColor.withValues(
+                                alpha: 0.9,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            // Show warning if overriding AI decision
+            if (post.aiReason != null && post.aiReason!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
                   color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -914,56 +1012,10 @@ class _PostsListScreenState extends State<PostsListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Ghi đè quyết định của Admin',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange.shade800,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Admin đã từ chối vì: ${post.adminReason}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 16),
-            // Show warning if overriding AI decision
-            if (post.aiReason != null && post.aiReason!.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: infoBackgroundColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: infoBackgroundColor.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: infoBackgroundColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
                             'Ghi đè quyết định của AI',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: infoBackgroundColor,
+                              color: Colors.orange,
                               fontSize: 13,
                             ),
                           ),
@@ -972,7 +1024,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                             'AI đã từ chối vì: ${post.aiReason}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: infoBackgroundColor,
+                              color: Colors.orange,
                             ),
                           ),
                         ],
