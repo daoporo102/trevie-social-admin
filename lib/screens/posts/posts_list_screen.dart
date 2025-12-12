@@ -613,7 +613,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
         // Uid
         DataCell(
           Text(
-            post.uid,
+            post.postId,
             style: const TextStyle(
               fontSize: 13,
               overflow: TextOverflow.ellipsis,
