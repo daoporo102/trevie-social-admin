@@ -10,7 +10,7 @@ import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/create_post_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
-import 'package:social_media_admin/widgets/post_detail_dialog.dart';
+import 'package:social_media_admin/widgets/post_details_dialog.dart';
 import 'package:social_media_admin/widgets/reject_post_dialog.dart';
 
 class PostsListScreen extends StatefulWidget {
