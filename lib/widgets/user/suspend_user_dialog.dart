@@ -32,9 +32,7 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill if user is already suspended
     if (widget.isCurrentlySuspended && widget.user.suspensionReason != null) {
-      // Try to match with predefined reasons
       if (_predefinedReasons.contains(widget.user.suspensionReason)) {
         _selectedReason = widget.user.suspensionReason;
       } else {
@@ -63,39 +61,105 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
     final isActivating = widget.isCurrentlySuspended;
 
     return AlertDialog(
-      title: Text(isActivating ? 'Kích hoạt người dùng' : 'Đình chỉ người dùng'),
-      content: SizedBox(
-        width: 500,
-        child: SingleChildScrollView(
+      backgroundColor: webBackgroundColor,
+      title: Row(
+        children: [
+          Icon(
+            isActivating ? Icons.check_circle : Icons.block,
+            color: isActivating ? appPrimaryColor : Colors.orange,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isActivating ? 'Kích hoạt người dùng' : 'Đình chỉ người dùng',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryTextColor,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 500,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // User Preview
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundImage: widget.user.photoUrl.isNotEmpty
+                          ? NetworkImage(widget.user.photoUrl)
+                          : null,
+                      child: widget.user.photoUrl.isEmpty
+                          ? Icon(Icons.person, size: 24, color: appPrimaryColor)
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.user.displayName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.user.email,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Main confirmation message
               Text(
                 isActivating
-                    ? 'Bạn có chắc chắn muốn kích hoạt lại người dùng "${widget.user.displayName}"?'
-                    : 'Bạn có chắc chắn muốn đình chỉ người dùng "${widget.user.displayName}"?',
-                style: const TextStyle(fontSize: 16),
+                    ? 'Bạn có chắc chắn muốn kích hoạt lại người dùng này?'
+                    : 'Bạn có chắc chắn muốn đình chỉ người dùng này?',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: primaryTextColor,
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Email: ${widget.user.email}',
-                style: TextStyle(fontSize: 14, color: secondaryColor),
-              ),
-              
+
               // Show reason selection only when suspending
               if (!isActivating) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 const Text(
                   'Lý do đình chỉ: *',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
+                    color: primaryTextColor,
                   ),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedReason,
+                  value: _selectedReason,
                   decoration: InputDecoration(
                     hintText: 'Chọn lý do đình chỉ',
                     border: OutlineInputBorder(
@@ -107,10 +171,7 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
                     ),
                   ),
                   items: _predefinedReasons.map((reason) {
-                    return DropdownMenuItem(
-                      value: reason,
-                      child: Text(reason),
-                    );
+                    return DropdownMenuItem(value: reason, child: Text(reason));
                   }).toList(),
                   onChanged: (value) {
                     setState(() {
@@ -130,6 +191,7 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
+                      color: primaryTextColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -150,7 +212,7 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
 
               // Show current suspension reason when activating
               if (isActivating && widget.user.suspensionReason != null) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -194,7 +256,9 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
                 ),
               ],
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+
+              // Info message
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -239,9 +303,8 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
           onPressed: () => Navigator.pop(context, null),
           child: const Text('Hủy'),
         ),
-        ElevatedButton(
+        ElevatedButton.icon(
           onPressed: () {
-            // If suspending, require reason
             if (!isActivating) {
               final reason = _getSuspensionReason();
               if (reason == null || reason.isEmpty) {
@@ -255,16 +318,16 @@ class _SuspendUserDialogState extends State<SuspendUserDialog> {
               }
               Navigator.pop(context, reason);
             } else {
-              // If activating, no reason needed
-              Navigator.pop(context, ''); // Empty string means activate
+              Navigator.pop(context, '');
             }
           },
+          icon: Icon(isActivating ? Icons.check_circle : Icons.block),
+          label: Text(isActivating ? 'Kích hoạt' : 'Đình chỉ'),
           style: ElevatedButton.styleFrom(
             backgroundColor: isActivating ? appPrimaryColor : Colors.orange,
-            foregroundColor: Colors.white,
+            foregroundColor: onPrimaryColor,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
-          child: Text(isActivating ? 'Kích hoạt' : 'Đình chỉ'),
         ),
       ],
     );

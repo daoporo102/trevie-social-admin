@@ -9,12 +9,12 @@ import 'package:social_media_admin/services/user_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
-import 'package:social_media_admin/widgets/add_user_dialog.dart';
+import 'package:social_media_admin/widgets/user/add_user_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 import 'package:social_media_admin/services/admin_management_service.dart';
-import 'package:social_media_admin/widgets/delete_user_dialog.dart';
-import 'package:social_media_admin/widgets/suspend_user_dialog.dart';
-import 'package:social_media_admin/widgets/update_user_dialog.dart';
+import 'package:social_media_admin/widgets/user/delete_user_dialog.dart';
+import 'package:social_media_admin/widgets/user/suspend_user_dialog.dart';
+import 'package:social_media_admin/widgets/user/update_user_dialog.dart';
 
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
@@ -298,7 +298,15 @@ class _UsersListScreenState extends State<UsersListScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Xác nhận xóa vĩnh viễn'),
+        backgroundColor: webBackgroundColor,
+        title: const Text(
+          'Xác nhận xóa vĩnh viễn',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: errorBackgroundColor,
+          ),
+        ),
         content: Text(
           'Bạn có chắc chắn muốn xóa VĨNH VIỄN người dùng "${user.displayName}"?\n\n'
           'Hành động này KHÔNG THỂ HOÀN TÁC!',
@@ -475,6 +483,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
                 icon: const Icon(Icons.search),
                 label: const Text('Tìm kiếm'),
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: appPrimaryColor,
+                  foregroundColor: onPrimaryColor,
                   padding: const EdgeInsets.symmetric(
                     vertical: 16.0,
                     horizontal: 20.0,

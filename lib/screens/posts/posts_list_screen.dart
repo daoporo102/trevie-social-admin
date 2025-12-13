@@ -8,10 +8,12 @@ import 'package:social_media_admin/services/post_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
-import 'package:social_media_admin/widgets/create_post_dialog.dart';
+import 'package:social_media_admin/widgets/post/approve_post_dialog.dart';
+import 'package:social_media_admin/widgets/post/create_post_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
-import 'package:social_media_admin/widgets/post_detail_dialog.dart';
-import 'package:social_media_admin/widgets/reject_post_dialog.dart';
+import 'package:social_media_admin/widgets/post/delete_post_dialog.dart';
+import 'package:social_media_admin/widgets/post/post_details_dialog.dart';
+import 'package:social_media_admin/widgets/post/reject_post_dialog.dart';
 
 class PostsListScreen extends StatefulWidget {
   const PostsListScreen({super.key});
@@ -152,24 +154,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
   Future<void> _deletePost(Post post) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text(
-          'Bạn có chắc chắn muốn xóa bài viết này?\n\n'
-          'Hành động này không thể hoàn tác!',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: errorBackgroundColor),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
+      builder: (context) => DeletePostDialog(post: post),
     );
 
     if (confirm != true || !mounted) return;
@@ -1022,128 +1007,16 @@ class _PostsListScreenState extends State<PostsListScreen> {
 
   // Add this new method to approve posts
   Future<void> _approvePost(Post post) async {
+    final isOverridingAdmin =
+        post.adminReason != null && post.adminReason!.isNotEmpty;
+    final isOverridingAI = post.aiReason != null && post.aiReason!.isNotEmpty;
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận duyệt bài viết'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Bạn có chắc chắn muốn duyệt bài viết này?\n\n'
-              'Bài viết sẽ hiển thị công khai trên ứng dụng.',
-            ),
-            const SizedBox(height: 16),
-            // Show warning if overriding Admin decision
-            if (post.adminReason != null && post.adminReason!.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: errorBackgroundColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: errorBackgroundColor.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: errorBackgroundColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ghi đè quyết định của Admin',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: errorBackgroundColor,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Admin đã từ chối vì: ${post.adminReason}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: errorBackgroundColor.withValues(
-                                alpha: 0.9,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 16),
-            // Show warning if overriding AI decision
-            if (post.aiReason != null && post.aiReason!.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.orange,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ghi đè quyết định của AI',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'AI đã từ chối vì: ${post.aiReason}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appPrimaryColor,
-              foregroundColor: onPrimaryColor,
-            ),
-            child: const Text('Duyệt'),
-          ),
-        ],
+      builder: (context) => ApprovePostDialog(
+        post: post,
+        isOverridingAdmin: isOverridingAdmin,
+        isOverridingAI: isOverridingAI,
       ),
     );
 
