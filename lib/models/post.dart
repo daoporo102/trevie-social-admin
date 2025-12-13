@@ -28,7 +28,7 @@ class Post {
   final DateTime? moderatedAt;
   final String? updateStatus;
   final String? updateError;
-
+  final String? attemptedUpdateText;
 
   const Post({
     required this.postId,
@@ -56,6 +56,7 @@ class Post {
     this.moderatedAt,
     this.updateStatus,
     this.updateError,
+    this.attemptedUpdateText,
   });
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +89,7 @@ class Post {
         : null,
     "updateStatus": updateStatus,
     "updateError": updateError,
+    "attemptedUpdateText": attemptedUpdateText,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -143,6 +145,7 @@ class Post {
       moderatedAt: parseDateField(snapshotData['moderatedAt']),
       updateStatus: snapshotData['updateStatus'],
       updateError: snapshotData['updateError'],
+      attemptedUpdateText: snapshotData['attemptedUpdateText'],
     );
   }
 }
