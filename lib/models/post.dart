@@ -26,6 +26,8 @@ class Post {
   final String? adminReason;
   final String? moderatedBy;
   final DateTime? moderatedAt;
+  final String? updateStatus;
+  final String? updateError;
 
 
   const Post({
@@ -51,7 +53,9 @@ class Post {
     this.aiReason,
     this.adminReason,
     this.moderatedBy,
-    this.moderatedAt
+    this.moderatedAt,
+    this.updateStatus,
+    this.updateError,
   });
 
   Map<String, dynamic> toJson() => {
@@ -82,6 +86,8 @@ class Post {
     "moderatedAt": moderatedAt != null
         ? Timestamp.fromDate(moderatedAt!)
         : null,
+    "updateStatus": updateStatus,
+    "updateError": updateError,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -135,6 +141,8 @@ class Post {
       adminReason: snapshotData['adminReason'],
       moderatedBy: snapshotData['moderatedBy'],
       moderatedAt: parseDateField(snapshotData['moderatedAt']),
+      updateStatus: snapshotData['updateStatus'],
+      updateError: snapshotData['updateError'],
     );
   }
 }

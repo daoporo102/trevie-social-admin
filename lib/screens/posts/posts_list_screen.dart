@@ -10,6 +10,7 @@ import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
 import 'package:social_media_admin/widgets/create_post_dialog.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
+import 'package:social_media_admin/widgets/post_detail_dialog.dart';
 import 'package:social_media_admin/widgets/reject_post_dialog.dart';
 
 class PostsListScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
   }
 
   Future<void> _loadPosts({bool refresh = false}) async {
-    if (_isLoading) return;
+    if (_isLoading || !mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -222,6 +223,66 @@ class _PostsListScreenState extends State<PostsListScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _openPostDetailDialog(Post post) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (context) => Center(child: customCircularProgressIndicator()),
+    );
+
+    try {
+      // Fetch fresh post details from Firestore
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.postId)
+          .get();
+
+      // Close loading dialog
+      closeLoading();
+
+      // Small delay to ensure loading dialog is closed
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Check mounted again after delay
+      if (!mounted) return;
+
+      // Check data & open details Dialog
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        await showDialog(
+          context: context,
+          useRootNavigator: true,
+          builder: (context) => PostDetailDialog(data: docSnapshot.data()!),
+        );
+      } else {
+        displaySnackBar(
+          'Bài viết không tồn tại hoặc đã bị xóa.',
+          context,
+          SnackBarType.error,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close Loading Dialog if it is still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      avoidPrint('Error loading post details: $e');
+      displaySnackBar(
+        'Lỗi khi tải chi tiết bài viết: $e',
+        context,
+        SnackBarType.error,
+      );
+    }
+  }
+
+  void closeLoading() {
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   @override
@@ -461,7 +522,10 @@ class _PostsListScreenState extends State<PostsListScreen> {
         headingRowHeight: 56,
         columns: const [
           DataColumn2(
-            label: Text('Uid', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(
+              'Uid bài đăng',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             size: ColumnSize.S,
           ),
           DataColumn2(
@@ -531,7 +595,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
               'Hành động',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.S,
+            size: ColumnSize.M,
           ),
         ],
         rows: [
@@ -915,6 +979,15 @@ class _PostsListScreenState extends State<PostsListScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // View Details button
+              IconButton(
+                icon: const Icon(Icons.visibility, size: 20),
+                tooltip: 'Xem chi tiết',
+                color: primaryTextColor,
+                onPressed: () async {
+                  _openPostDetailDialog(post);
+                },
+              ),
               // Approve button (only for rejected/pending posts)
               if (post.status == 'rejected' || post.status == 'pending_review')
                 IconButton(

@@ -47,27 +47,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _verifyAdminAccess() async {
     final user = FirebaseAuth.instance.currentUser;
-
-    if (user != null && user.email != null) {
+    if (user != null) {
       try {
         avoidPrint("Đang chuẩn bị kiểm tra quyền...");
-        
-        // Refresh token to ensure latest claims
-        await user.getIdToken(true);
-        avoidPrint("Token đã sẵn sàng, bắt đầu gọi Function...");
-        // ---------------------------------------------
-
         final status = await _adminService.checkAdminStatus(user.email!);
-
         avoidPrint("Kết quả check: $status");
-
         if (status['isAdmin'] == true) {
           // Nếu là admin, lại refresh lần nữa để đảm bảo các request sau này (như tạo user) ok
           await user.getIdToken(true);
           avoidPrint("Đã đồng bộ quyền Admin thành công!");
-          setState(() {
-            // Cập nhật UI nếu cần
-          });
+          // FIXED: Check mounted before setState
+          if (mounted) {
+            setState(() {
+              // Cập nhật UI nếu cần
+            });
+          }
         } else {
           avoidPrint("Tài khoản này không có quyền truy cập Dashboard");
         }
