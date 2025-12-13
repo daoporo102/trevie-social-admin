@@ -38,8 +38,9 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with existing user data
-    _displayNameController = TextEditingController(text: widget.user.displayName);
+    _displayNameController = TextEditingController(
+      text: widget.user.displayName,
+    );
     _bioController = TextEditingController(text: widget.user.bio ?? '');
     _selectedDateOfBirth = widget.user.dateOfBirth;
     _dateOfBirthController = TextEditingController(
@@ -96,7 +97,6 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
   }
 
   Future<void> _updateUser() async {
-    // Validate required fields
     if (_displayNameController.text.trim().isEmpty) {
       displaySnackBar(
         'Vui lòng nhập tên hiển thị',
@@ -106,7 +106,6 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
       return;
     }
 
-    // Validate bio length
     if (_bioController.text.trim().isNotEmpty &&
         _bioController.text.trim().length > 150) {
       displaySnackBar(
@@ -117,7 +116,6 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
       return;
     }
 
-    // Validate date of birth
     if (_selectedDateOfBirth != null &&
         _selectedDateOfBirth!.isAfter(DateTime.now())) {
       displaySnackBar('Ngày sinh không hợp lệ', context, SnackBarType.error);
@@ -173,7 +171,21 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Cập nhật thông tin người dùng'),
+      backgroundColor: webBackgroundColor,
+      title: Row(
+        children: [
+          Icon(Icons.edit, color: infoBackgroundColor),
+          const SizedBox(width: 8),
+          const Text(
+            'Cập nhật thông tin người dùng',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryTextColor,
+            ),
+          ),
+        ],
+      ),
       content: SingleChildScrollView(
         child: SizedBox(
           width: 500,
@@ -182,36 +194,76 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Profile Image Picker
+              const Text(
+                'Ảnh đại diện:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               Center(
                 child: Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 64,
-                      backgroundColor: appPrimaryColor.withValues(alpha: 0.2),
-                      backgroundImage: _newImage != null
-                          ? MemoryImage(_newImage!)
-                          : widget.user.photoUrl.isNotEmpty
-                              ? NetworkImage(widget.user.photoUrl)
-                              : null,
-                      child: _newImage == null && widget.user.photoUrl.isEmpty
-                          ? Icon(
-                              Icons.person,
-                              size: 48,
-                              color: appPrimaryColor,
-                            )
-                          : null,
+                    GestureDetector(
+                      onTap: _isUpdating ? null : _selectImage,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: appPrimaryColor.withValues(alpha: 0.1),
+                          border: Border.all(
+                            color: appPrimaryColor.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: _newImage != null
+                            ? ClipOval(
+                                child: Image.memory(
+                                  _newImage!,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : widget.user.photoUrl.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(
+                                  widget.user.photoUrl,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 48,
+                                color: appPrimaryColor,
+                              ),
+                      ),
                     ),
                     Positioned(
-                      bottom: -10,
-                      right: -10,
-                      child: IconButton(
-                        icon: const Icon(Icons.edit),
-                        color: appPrimaryColor,
-                        onPressed: _isUpdating ? null : _selectImage,
-                        style: IconButton.styleFrom(
-                          backgroundColor: onPrimaryColor,
-                          shape: CircleBorder(
-                            side: BorderSide(color: appPrimaryColor, width: 2),
+                      bottom: 0,
+                      right: 0,
+                      child: Material(
+                        color: Colors.white,
+                        shape: const CircleBorder(),
+                        elevation: 2,
+                        child: InkWell(
+                          onTap: _isUpdating ? null : _selectImage,
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: appPrimaryColor,
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.edit,
+                              size: 20,
+                              color: appPrimaryColor,
+                            ),
                           ),
                         ),
                       ),
@@ -219,13 +271,22 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 24),
 
               // Email (Read-only)
+              const Text(
+                'Email: (Không thể thay đổi)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: TextEditingController(text: widget.user.email),
                 decoration: InputDecoration(
-                  labelText: 'Email (Không thể thay đổi)',
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -238,6 +299,15 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
               const SizedBox(height: 16),
 
               // Display Name
+              const Text(
+                'Tên hiển thị: *',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _displayNameController,
                 hintText: 'Nhập tên hiển thị',
@@ -249,12 +319,21 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
               const SizedBox(height: 16),
 
               // Bio
+              const Text(
+                'Tiểu sử: (Tùy chọn)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _bioController,
                 hintText: 'Nhập tiểu sử ngắn gọn',
-                textInputType: TextInputType.text,
+                textInputType: TextInputType.multiline,
                 prefixIcon: Icons.info_outline,
-                labelText: 'Tiểu sử (Tuỳ chọn)',
+                labelText: 'Tiểu sử',
                 isLoading: !_isUpdating,
                 helperText: 'Tối đa 150 ký tự',
                 maxLines: 3,
@@ -263,13 +342,22 @@ class _UpdateUserDialogState extends State<UpdateUserDialog> {
               const SizedBox(height: 16),
 
               // Date of Birth
+              const Text(
+                'Ngày sinh: (Tùy chọn)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               GestureDetector(
                 onTap: _isUpdating ? null : _selectDateOfBirth,
                 child: AbsorbPointer(
                   child: TextField(
                     controller: _dateOfBirthController,
                     decoration: InputDecoration(
-                      labelText: 'Ngày sinh (Tùy chọn)',
+                      labelText: 'Ngày sinh',
                       hintText: 'Chọn ngày sinh',
                       prefixIcon: const Icon(Icons.cake_outlined),
                       border: OutlineInputBorder(

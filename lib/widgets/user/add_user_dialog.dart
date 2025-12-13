@@ -19,7 +19,6 @@ class AddUserDialog extends StatefulWidget {
 }
 
 class _AddUserDialogState extends State<AddUserDialog> {
-  // Properties for create a new user
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _displayNameController = TextEditingController();
@@ -27,13 +26,9 @@ class _AddUserDialogState extends State<AddUserDialog> {
   final TextEditingController _dateOfBirthController = TextEditingController();
   Uint8List? _image;
   DateTime? _selectedDateOfBirth;
-
-  // This state variable for loading
   bool _isCreatingUser = false;
 
   final UserService _userService = UserService();
-
-  // Email regex for validation
   final emailRegexForValidation = emailRegex;
 
   @override
@@ -85,7 +80,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
   }
 
   Future<void> _createUser() async {
-    //  Validate required fields
+    // Validation
     if (_displayNameController.text.trim().isEmpty) {
       displaySnackBar(
         'Vui lòng nhập tên hiển thị',
@@ -94,6 +89,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
       );
       return;
     }
+
     if (_emailController.text.trim().isEmpty) {
       displaySnackBar('Vui lòng nhập email', context, SnackBarType.error);
       return;
@@ -131,7 +127,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
       return;
     }
 
-    // Validate bio length (optional)
     if (_bioController.text.trim().isNotEmpty &&
         _bioController.text.trim().length > 150) {
       displaySnackBar(
@@ -142,7 +137,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
       return;
     }
 
-    // Validate date of birth (optional)
     if (_selectedDateOfBirth != null &&
         _selectedDateOfBirth!.isAfter(DateTime.now())) {
       displaySnackBar('Ngày sinh không hợp lệ', context, SnackBarType.error);
@@ -168,7 +162,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
       if (!mounted) return;
 
       if (user != null) {
-        // Success
         displaySnackBar(
           'Đã tạo người dùng "${user.displayName}" thành công',
           context,
@@ -177,7 +170,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
         widget.onUserCreated();
         Navigator.pop(context);
       } else {
-        // Failed
         displaySnackBar(
           'Không thể tạo người dùng. Vui lòng thử lại.',
           context,
@@ -187,7 +179,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
     } catch (e) {
       if (!mounted) return;
       displaySnackBar(
-        'Đã xảy ra lỗi khi tạo người dùng, vui lòng thử lại sau.',
+        'Đã xảy ra lỗi khi tạo người dùng: ${e.toString()}',
         context,
         SnackBarType.error,
       );
@@ -204,7 +196,21 @@ class _AddUserDialogState extends State<AddUserDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Thêm người dùng mới'),
+      backgroundColor: webBackgroundColor,
+      title: Row(
+        children: [
+          Icon(Icons.person_add, color: appPrimaryColor),
+          const SizedBox(width: 8),
+          const Text(
+            'Thêm người dùng mới',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryTextColor,
+            ),
+          ),
+        ],
+      ),
       content: SingleChildScrollView(
         child: SizedBox(
           width: 500,
@@ -212,50 +218,115 @@ class _AddUserDialogState extends State<AddUserDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Info message
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: infoBackgroundColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: infoBackgroundColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: infoBackgroundColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Chỉ Super Admin mới có quyền tạo người dùng mới trong hệ thống.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: infoBackgroundColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               // Profile Image Picker
+              const Text(
+                'Ảnh đại diện: *',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+
               Center(
                 child: Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 64,
-                      backgroundColor: appPrimaryColor.withValues(alpha: 0.2),
-                      backgroundImage: _image != null
-                          ? MemoryImage(_image!)
-                          : null,
-                      child: _image == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 48,
-                                  color: appPrimaryColor,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Chọn ảnh',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                    GestureDetector(
+                      onTap: _isCreatingUser ? null : _selectImage,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: appPrimaryColor.withValues(alpha: 0.1),
+                          border: Border.all(
+                            color: appPrimaryColor.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: _image != null
+                            ? ClipOval(
+                                child: Image.memory(_image!, fit: BoxFit.cover),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person,
+                                    size: 48,
                                     color: appPrimaryColor,
                                   ),
-                                ),
-                              ],
-                            )
-                          : null,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Chọn ảnh',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: appPrimaryColor,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
                     Positioned(
-                      bottom: -10,
-                      right: -10,
-                      child: IconButton(
-                        icon: Icon(
-                          _image == null ? Icons.add_a_photo : Icons.edit,
-                        ),
-                        color: appPrimaryColor,
-                        onPressed: _isCreatingUser ? null : _selectImage,
-                        style: IconButton.styleFrom(
-                          backgroundColor: onPrimaryColor,
-                          shape: CircleBorder(
-                            side: BorderSide(color: appPrimaryColor, width: 2),
+                      bottom: 0,
+                      right: 0,
+                      child: Material(
+                        color: Colors.white,
+                        shape: const CircleBorder(),
+                        elevation: 2,
+                        child: InkWell(
+                          onTap: _isCreatingUser ? null : _selectImage,
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: appPrimaryColor,
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              _image == null ? Icons.add_a_photo : Icons.edit,
+                              size: 20,
+                              color: appPrimaryColor,
+                            ),
                           ),
                         ),
                       ),
@@ -267,6 +338,15 @@ class _AddUserDialogState extends State<AddUserDialog> {
               const SizedBox(height: 24),
 
               // Display Name
+              const Text(
+                'Tên hiển thị: *',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _displayNameController,
                 hintText: 'Nhập tên hiển thị',
@@ -278,47 +358,87 @@ class _AddUserDialogState extends State<AddUserDialog> {
               const SizedBox(height: 16),
 
               // Email
+              const Text(
+                'Địa chỉ Email: *',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _emailController,
-                hintText: 'Nhập địa chỉ email của bạn',
+                hintText: 'Nhập địa chỉ email',
                 textInputType: TextInputType.emailAddress,
                 prefixIcon: Icons.email_outlined,
-                labelText: 'Địa chỉ Email',
+                labelText: 'Email',
                 isLoading: !_isCreatingUser,
               ),
               const SizedBox(height: 16),
-              // Phone
+
+              // Password
+              const Text(
+                'Mật khẩu: *',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _passwordController,
-                hintText: 'Nhập mật khẩu của bạn',
+                hintText: 'Nhập mật khẩu (tối thiểu 6 ký tự)',
                 textInputType: TextInputType.text,
                 prefixIcon: Icons.lock_outline,
                 labelText: 'Mật khẩu',
                 isLoading: !_isCreatingUser,
                 isPass: true,
+                helperText: 'Tối thiểu 6 ký tự',
               ),
               const SizedBox(height: 16),
-              // Password
+
+              // Bio
+              const Text(
+                'Tiểu sử: (Tùy chọn)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFieldInput(
                 textEditingController: _bioController,
                 hintText: 'Nhập tiểu sử ngắn gọn',
-                textInputType: TextInputType.text,
+                textInputType: TextInputType.multiline,
                 prefixIcon: Icons.info_outline,
-                labelText: 'Tiểu sử (Tuỳ chọn)',
+                labelText: 'Tiểu sử',
                 isLoading: !_isCreatingUser,
                 helperText: 'Tối đa 150 ký tự',
                 maxLines: 3,
                 maxLength: 150,
               ),
               const SizedBox(height: 16),
+
               // Date of Birth
+              const Text(
+                'Ngày sinh: (Tùy chọn)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               GestureDetector(
                 onTap: _isCreatingUser ? null : _selectDateOfBirth,
                 child: AbsorbPointer(
                   child: TextField(
                     controller: _dateOfBirthController,
                     decoration: InputDecoration(
-                      labelText: 'Ngày sinh (Tùy chọn)',
+                      labelText: 'Ngày sinh',
                       hintText: 'Chọn ngày sinh',
                       prefixIcon: const Icon(Icons.cake_outlined),
                       border: OutlineInputBorder(
