@@ -65,10 +65,24 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Từ chối bài viết'),
-      content: SizedBox(
-        width: 500,
-        child: SingleChildScrollView(
+      backgroundColor: webBackgroundColor,
+      title: Row(
+        children: [
+          Icon(Icons.block, color: Colors.orange),
+          const SizedBox(width: 8),
+          const Text(
+            'Từ chối bài viết',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: primaryTextColor,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 500,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,11 +114,13 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
                               : null,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          widget.post.displayName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                        Expanded(
+                          child: Text(
+                            widget.post.displayName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
@@ -159,7 +175,11 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
 
               const Text(
                 'Lý do từ chối: *',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: primaryTextColor,
+                ),
               ),
               const SizedBox(height: 8),
 
@@ -194,7 +214,11 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
                 const SizedBox(height: 16),
                 const Text(
                   'Chi tiết: *',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: primaryTextColor,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -211,15 +235,17 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
                 ),
               ],
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Warning message
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: errorBackgroundColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: errorBackgroundColor.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -230,7 +256,7 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
                         'Bài viết sẽ bị ẩn khỏi ứng dụng và người dùng sẽ được thông báo về lý do từ chối.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.red.shade800,
+                          color: errorBackgroundColor,
                         ),
                       ),
                     ),
@@ -246,13 +272,13 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
           onPressed: () => Navigator.pop(context, null),
           child: const Text('Hủy'),
         ),
-        ElevatedButton(
+        ElevatedButton.icon(
           onPressed: () {
             final reason = _getRejectionReason();
             if (reason == null || reason.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Vui lòng chọn hoặc nhập lý do từ chối'),
+                SnackBar(
+                  content: const Text('Vui lòng chọn hoặc nhập lý do từ chối'),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -260,12 +286,13 @@ class _RejectPostDialogState extends State<RejectPostDialog> {
             }
             Navigator.pop(context, {'reason': reason});
           },
+          icon: const Icon(Icons.block),
+          label: const Text('Từ chối bài viết'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
+            foregroundColor: onPrimaryColor,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
-          child: const Text('Từ chối'),
         ),
       ],
     );
