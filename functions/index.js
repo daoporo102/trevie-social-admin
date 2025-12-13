@@ -375,6 +375,12 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
     return;
   }
 
+  // If previous update was failed due to AI rollback, skip check to avoid loop
+  if (afterData.status === "active" && afterData.updateStatus === "failed" && afterData.moderatedBy === "AI_Rollback") {
+    console.log(`Bỏ qua check vì đây là thao tác Rollback của hệ thống.`);
+    return;
+  }
+
   // If text changed, proceed to check with AI
   console.log(`[UPDATE] Bài ${postId} đã thay đổi nội dung văn bản. Gửi lại tới AI để kiểm tra...`);
 
@@ -405,13 +411,16 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
     const aiResult = response.data;
     // process AI result
     if (aiResult.is_toxic === true) {
-      // if toxic,
+      // if toxic, rollback to old text and set status to active
+      console.log(`AI phát hiện nội dung độc hại khi Update: ${aiResult.reason}`);
+
       await afterDoc.ref.update({
         postText: oldText,
         status: "active",
         // update failed
         updateStatus: "failed",
-        updateError: `Cập nhật đã bị AI từ chối vì: ${aiResult.reason}`,
+        updateError: `${aiResult.reason}`,
+        attemptedUpdateText: newText,
         // get old time
         lastDateModified: beforeData.lastDateModified,
         dateUpdated: beforeData.dateUpdated,
@@ -428,6 +437,7 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
         aiReason: null,
         updateStatus: "success",
         updateError: null,
+        attemptedUpdateText: null,
         moderatedBy: "AI_Update",
         moderatedAt: admin.firestore.Timestamp.now(),
       });
