@@ -20,14 +20,20 @@ class PostService {
     DateTime? endDate,
     PostSortField sortBy = PostSortField.datePublished,
     bool ascending = false,
-    String? status, // Add this parameter
+    String? status,
   }) async {
     try {
       Query query = _firestore.collection('posts');
 
       // Add status filter if provided
       if (status != null && status.isNotEmpty) {
-        query = query.where('status', isEqualTo: status);
+        // Special handling for 'update_failed' status
+        if(status=='update_failed'){
+          query = query.where('updateStatus', isEqualTo: 'failed');
+        } else {
+          // Regular status filter
+          query = query.where('status', isEqualTo: status);
+        }
       }
 
       // Apply sorting

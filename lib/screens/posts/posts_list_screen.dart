@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:social_media_admin/models/post.dart';
+import 'package:social_media_admin/screens/posts/post_violation_dialog.dart';
 import 'package:social_media_admin/services/post_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
@@ -404,6 +405,11 @@ class _PostsListScreenState extends State<PostsListScreen> {
                       value: 'processing',
                       child: Text('Đang xử lý'),
                     ),
+
+                    DropdownMenuItem(
+                      value: 'update_failed',
+                      child: Text('Cập nhật bị chặn'),
+                    ),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -782,6 +788,78 @@ class _PostsListScreenState extends State<PostsListScreen> {
                       ],
                     ),
                   ),
+
+                  // Warning
+                  if (post.attemptedUpdateText != null) ...[
+                    const SizedBox(height: 4),
+                    Tooltip(
+                      message: 'Có vi phạm cập nhật! Bấm để xem chi tiết.',
+                      child: IconButton(
+                        onPressed: () async {
+                          // Show Loading
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (c) => Center(
+                              child: customCircularProgressIndicator(),
+                            ),
+                          );
+
+                          try {
+                            // Fetch fresh post data
+                            final docSnapshot = await FirebaseFirestore.instance
+                                .collection('posts')
+                                .doc(post.postId)
+                                .get();
+
+                            // Close loading
+                            closeLoading();
+
+                            if (docSnapshot.exists &&
+                                docSnapshot.data() != null) {
+                              if (!mounted) return;
+
+                              final freshPost = Post.fromSnap(docSnapshot);
+
+                              showDialog(
+                                context: context,
+                                builder: (context) =>
+                                    PostViolationDialog(post: freshPost),
+                              );
+                            } else {
+                              if (!mounted) return;
+                              displaySnackBar(
+                                'Bài viết không tồn tại hoặc đã bị xóa.',
+                                context,
+                                SnackBarType.error,
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            displaySnackBar(
+                              'Lỗi tải dữ liệu: $e',
+                              context,
+                              SnackBarType.error,
+                            );
+                            avoidPrint('Error fetching post for violation: $e');
+                          }
+                        },
+                        icon: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Icon(
+                            Icons.priority_high_rounded,
+                            size: 16,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   // check AI system failover in approve post
                   if (isSystemFailover) ...[
