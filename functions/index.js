@@ -441,7 +441,7 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
       // if not toxic, set status to active
       await afterDoc.ref.update({
         status: "active",
-        aiReason: null,
+        aiReasonText: null,
         updateStatus: "success",
         updateError: null,
         attemptedUpdateText: null,
@@ -460,7 +460,7 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
     await afterDoc.ref.update({
       status: "active",
       moderatedBy: "system_failover",
-      aiReason: "Dich vụ AI lỗi -> tự động duyệt",
+      aiReasonText: "Dich vụ AI lỗi -> tự động duyệt",
       moderatedAt: admin.firestore.Timestamp.now(),
     });
     console.log(` Đã Auto-Approve bài viết do lỗi.`);
@@ -496,14 +496,15 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
 
   // Variables for storing test results
   let isTextToxic = false;
-  let textReason = "";
+  let textReason = null;
 
   let isImageUnsafe = false;
-  let imageReason = "";
+  let imageReason = null;
 
   // RUN BOTH CHECKS SIMULTANEOUSLY (Promise.all)
   // Text & Image are Checked in Parallel
 
+  // Check Text
   const checkTextPromise = async ()=>{
     // text == null => skip
     if (!text) return;
@@ -527,6 +528,7 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     }
   };
 
+  // Check Image
   const checkImagePromise = async ()=>{
     // image == null => skip
     if (!image) return;
@@ -534,10 +536,20 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     try {
       console.log(`Checking Image...`);
       // Use Google Vision to check image safety
-      const [result] = await visionClient.safeSearchDetection(image);
-      const detections = result.safeSearchAnnotation;
+      const [result] = await visionClient.annotateImage({
+        image: {source: {imageUri: image}},
+        features: [
+          {type: "SAFE_SEARCH_DETECTION"},
+          {type: "LABEL_DETECTION", maxResults: 10}, // get 10 labels
+        ],
+      });
 
-      console.log(`Kết quả Vision chi tiết cho bài ${postId}:`, JSON.stringify(detections));
+      const safeSearch = result.safeSearchAnnotation;
+      const labels = result.labelAnnotations;
+
+      const labelDescriptions = labels.map((l) => l.description).join(", ");
+      console.log(`Vision Labels: [${labelDescriptions}]`);
+      console.log(`Vision SafeSearch:`, JSON.stringify(safeSearch));
 
       // Check the likelihood of unsafe content
       // LIKELY: khả năng cao
@@ -547,24 +559,46 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       // VERY_UNLIKELY: rất không có khả năng
       // UNKNOWN: không xác định
 
-      // const isUnsafe = (likelihood) => {
-      //   return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
-      // };
-
-      const isViolenceOrMedicalUnsafe = (likelihood) => {
-        return likelihood === "POSSIBLE" || likelihood === "LIKELY";
+      // CLASS 1: CHECK SAFE SEARCH
+      const isViolenceUnsafe = (likelihood) => {
+        return likelihood === "POSSIBLE" || likelihood === "LIKELY"|| likelihood === "VERY_LIKELY";
       };
 
       const isAdultUnsafe = (likelihood) => {
-        return likelihood === "POSSIBLE" || likelihood === "VERY_LIKELY";
+        return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
       };
 
-      if (isAdultUnsafe(detections.adult)) imageReason = "Chứa nội dung người lớn (18+)";
-      else if (isViolenceOrMedicalUnsafe(detections.violence)) imageReason = "Chứa nội dung bạo lực (Vũ khí/Đánh nhau)";
-      else if (isAdultUnsafe(detections.racy)) imageReason = "Chứa nội dung gợi cảm/hở hang";
-      else if (isViolenceOrMedicalUnsafe(detections.medical)) imageReason = "Chứa nội dung máu me/y tế";
-      else if (isAdultUnsafe(detections.spoof)) imageReason = "Chứa nội dung giả mạo";
+      if (isAdultUnsafe(safeSearch.adult)) imageReason = "Chứa nội dung người lớn (18+)";
+      else if (isViolenceUnsafe(safeSearch.violence)) imageReason = "Chứa nội dung bạo lực";
+      else if (isAdultUnsafe(safeSearch.racy)) imageReason = "Hình ảnh quá gợi cảm";
+      else if (isViolenceUnsafe(safeSearch.medical)) imageReason = "Hình ảnh máu me/y tế";
 
+      // CLASS 2: CHECK KEYWORDS (LABEL)
+      // If class 1 hasn't caught it yet, use class 2 to scan for forbidden keywords.
+      if (!imageReason && labels) {
+        // Define forbidden keywords
+        const BLACKLIST_LABELS = [
+          "blood", "bleeding", "injury", "wound", // Blood, injury
+          "explosion", "bomb", "grenade", // Violence explosion
+          "gun", "firearm", "pistol", "rifle", "weapon", "sword", "knife", // Weapons
+          "fight", "fighting", "assault", "violence", // Fighting
+          "horror", "terror", // Horror
+        ];
+
+        // Check if any label is in the blacklist
+        for (const label of labels) {
+          const labelName = label.description.toLowerCase();
+          const score = label.score; // Accuracy (0.0 - 1.0)
+
+          // Check if label is in the blacklist
+          if (BLACKLIST_LABELS.some((badWord) => labelName.includes(badWord)) && score > 0.7) {
+            imageReason = `Phát hiện vật thể/nội dung cấm: ${label.description} (${Math.round(score*100)}%)`;
+            break; // block
+          }
+        }
+      }
+
+      // If any reason found, mark image as unsafe
       if (imageReason) {
         isImageUnsafe = true;
       }
@@ -584,23 +618,24 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   const isRejected = isTextToxic || isImageUnsafe;
   let finalReason = null;
 
-  //
+  // Log the final decision
   if (isRejected) {
     const reasons = [];
     if (isTextToxic) reasons.push(`Văn bản: ${textReason}`);
     if (isImageUnsafe) reasons.push(`Hình ảnh: ${imageReason}`);
     // join text + image reasons
     finalReason = reasons.join(" | ");
-    console.log(` BLOCK Bài ${postId}, lý do: ${finalReason}`);
+    console.log(` [BLOCK] Bài ${postId}, lý do: ${finalReason}`);
   } else {
-    console.log(`ACTIVE Bài ${postId}, Nội dung sạch.`);
+    console.log(`[ACTIVE] Bài ${postId}, Nội dung sạch.`);
   }
 
   // Update post status based on checks
   try {
     await snapshot.ref.update({
       status: isRejected ? "rejected" : "active",
-      reason: finalReason, // null if active, string if rejected
+      aiReasonText: textReason,
+      aiReasonImage: imageReason,
       moderatedBy: "AI",
       moderatedAt: admin.firestore.Timestamp.now(),
       imageChecked: !!image, // mark if image was checked
