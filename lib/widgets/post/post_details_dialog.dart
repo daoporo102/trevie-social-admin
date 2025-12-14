@@ -40,8 +40,11 @@ class PostDetailDialog extends StatelessWidget {
         reshareInfo[key] = value;
       } else if ([
         'status',
-        'aiReason',
         'adminReason',
+        'aiReasonText',
+        'aiReasonImage',
+        'textChecked',
+        'imageChecked',
         'moderatedBy',
         'moderatedByAdminEmail',
         'moderatedAt',
@@ -303,12 +306,21 @@ class PostDetailDialog extends StatelessWidget {
       }
     }
 
-    // Highlight in red if it is erroneous information (Error/Reason/Failed).
+    // Highlight errors in red or orange based on type
     if (highlightError) {
-      if ((key.contains('Error') || key.contains('Reason')) && value != null) {
+      // 1. Admin reason => red
+      if (key == 'adminReason' || key == 'updateError' || value == 'failed') {
         valueColor = errorBackgroundColor;
       }
-      if (value == 'failed') {
+      // 2. AI reason (img+text) => orange
+      else if (key == 'aiReasonText' || key == 'aiReasonImage') {
+        valueColor = Colors.orange.shade800; // Màu cam đậm cho dễ đọc
+      }
+      // Other errors containing the word "Error" or "Reason" (excluding those handled by admin and AI above)
+      else if ((key.contains('Error') || key.contains('Reason')) &&
+          key != 'adminReason' &&
+          key != 'aiReasonText' &&
+          key != 'aiReasonImage') {
         valueColor = errorBackgroundColor;
       }
     }

@@ -203,7 +203,11 @@ class PostService {
         likesCount: 0,
         role: 'admin',
         status: 'processing',
-        aiReason: null,
+        adminReason: null,
+        aiReasonText: null,
+        aiReasonImage: null,
+        textChecked: false,
+        imageChecked: false,
       );
 
       // Save to Firestore

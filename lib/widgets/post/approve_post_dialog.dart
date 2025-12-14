@@ -78,6 +78,8 @@ class ApprovePostDialog extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
+
+                    // Post text
                     Text(
                       post.postText,
                       style: const TextStyle(fontSize: 13),
@@ -152,7 +154,10 @@ class ApprovePostDialog extends StatelessWidget {
               ],
 
               // Override AI warning
-              if (isOverridingAI && post.aiReason != null) ...[
+              if (isOverridingAI &&
+                  (post.aiReasonText != null && post.aiReasonText!.isNotEmpty ||
+                      post.aiReasonImage != null &&
+                          post.aiReasonImage!.isNotEmpty)) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -179,14 +184,34 @@ class ApprovePostDialog extends StatelessWidget {
                                 fontSize: 13,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Lý do từ chối của AI: ${post.aiReason}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade800,
+                            const SizedBox(height: 6),
+
+                            // Display Text reason if exists
+                            if (post.aiReasonText != null &&
+                                post.aiReasonText!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  '• Văn bản: ${post.aiReasonText}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
+
+                            // Display Image reason if exists
+                            if (post.aiReasonImage != null &&
+                                post.aiReasonImage!.isNotEmpty)
+                              Text(
+                                '• Hình ảnh: ${post.aiReasonImage}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange.shade800,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                           ],
                         ),
                       ),

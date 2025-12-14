@@ -75,8 +75,11 @@ class FirestoreMethod {
         originalProfImage: null,
         likesCount: 0,
         status: 'processing',
-        aiReason: null,
         adminReason: null,
+        aiReasonText: null,
+        aiReasonImage: null,
+        textChecked: false,
+        imageChecked: false,
       );
 
       _firestore.collection('posts').doc(postId).set(post.toJson());
@@ -463,8 +466,11 @@ class FirestoreMethod {
         originalProfImage: originalPost.profImage,
         likesCount: 0,
         status: 'processing',
-        aiReason: null,
         adminReason: null,
+        aiReasonText: null,
+        aiReasonImage: null,
+        textChecked: false,
+        imageChecked: false,
       );
 
       // Reference to the original post
