@@ -22,13 +22,16 @@ class Post {
   final String? originalProfImage;
   final String role;
   final String status;
-  final String? aiReason;
   final String? adminReason;
   final String? moderatedBy;
   final DateTime? moderatedAt;
   final String? updateStatus;
   final String? updateError;
   final String? attemptedUpdateText;
+  final String? aiReasonText;
+  final String? aiReasonImage;
+  final bool? textChecked;
+  final bool? imageChecked;
 
   const Post({
     required this.postId,
@@ -50,13 +53,16 @@ class Post {
     required this.likesCount,
     this.role = 'user',
     required this.status,
-    this.aiReason,
     this.adminReason,
     this.moderatedBy,
     this.moderatedAt,
     this.updateStatus,
     this.updateError,
     this.attemptedUpdateText,
+    this.aiReasonText,
+    this.aiReasonImage,
+    this.textChecked = false,
+    this.imageChecked = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -81,7 +87,6 @@ class Post {
     "likesCount": likes.length,
     "role": role,
     "status": status,
-    "aiReason": aiReason,
     "adminReason": adminReason,
     "moderatedBy": moderatedBy,
     "moderatedAt": moderatedAt != null
@@ -90,6 +95,10 @@ class Post {
     "updateStatus": updateStatus,
     "updateError": updateError,
     "attemptedUpdateText": attemptedUpdateText,
+    "aiReasonText": aiReasonText,
+    "aiReasonImage": aiReasonImage,
+    "textChecked": textChecked,
+    "imageChecked": imageChecked,
   };
 
   static Post fromSnap(DocumentSnapshot snapshot) {
@@ -139,13 +148,16 @@ class Post {
           snapshotData['likesCount'] ?? snapshotData['likes']?.length ?? 0,
       role: snapshotData['role'] ?? 'user',
       status: snapshotData['status'] ?? 'active',
-      aiReason: snapshotData['aiReason'],
       adminReason: snapshotData['adminReason'],
       moderatedBy: snapshotData['moderatedBy'],
       moderatedAt: parseDateField(snapshotData['moderatedAt']),
       updateStatus: snapshotData['updateStatus'],
       updateError: snapshotData['updateError'],
       attemptedUpdateText: snapshotData['attemptedUpdateText'],
+      aiReasonText: snapshotData['aiReasonText'],
+      aiReasonImage: snapshotData['aiReasonImage'],
+      textChecked: snapshotData['textChecked'] ?? false,
+      imageChecked: snapshotData['imageChecked'] ?? false,
     );
   }
 }
