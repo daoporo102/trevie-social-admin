@@ -289,6 +289,9 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
   // get post text
   const text = postData.postText || "";
 
+  // Check if post is a reshare or original post
+  const postType = postData.originalPostId ? "RESHARE" : "POST";
+
   // if no text, set status to active
   if (!text) {
     return snapshot.ref.update({status: "active"});
@@ -296,7 +299,7 @@ exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
 
   // start time
   const startTime = Date.now();
-  console.log(`[START] Bắt đầu gửi bài ${postId} tới AI...`);
+  console.log(`[START] [${postType}] Bắt đầu gửi bài ${postId} tới AI...`);
 
   try {
     console.log(`Đang gửi bài ${postId} tới AI Server...`);
