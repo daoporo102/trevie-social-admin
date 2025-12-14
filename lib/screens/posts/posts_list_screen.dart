@@ -545,7 +545,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
               'Trạng thái',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.L,
           ),
           DataColumn2(
             label: Text(
@@ -862,48 +862,48 @@ class _PostsListScreenState extends State<PostsListScreen> {
                   ],
 
                   // check AI system failover in approve post
-                  if (isSystemFailover) ...[
-                    const SizedBox(height: 4),
-                    Tooltip(
-                      message:
-                          post.aiReason ??
-                          'Hệ thống tự động duyệt do AI mất kết nối',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.cloud_off, // Icon thể hiện mất kết nối
-                              size: 12,
-                              color: Colors.orange.shade800,
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                'Lỗi AI (Tự duyệt)',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.orange.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  // if (isSystemFailover) ...[
+                  //   const SizedBox(height: 4),
+                  //   Tooltip(
+                  //     message:
+                  //         post.aiReason ??
+                  //         'Hệ thống tự động duyệt do AI mất kết nối',
+                  //     child: Container(
+                  //       padding: const EdgeInsets.symmetric(
+                  //         horizontal: 6,
+                  //         vertical: 2,
+                  //       ),
+                  //       decoration: BoxDecoration(
+                  //         color: Colors.orange.shade50,
+                  //         borderRadius: BorderRadius.circular(4),
+                  //         border: Border.all(color: Colors.orange.shade200),
+                  //       ),
+                  //       child: Row(
+                  //         mainAxisSize: MainAxisSize.min,
+                  //         children: [
+                  //           Icon(
+                  //             Icons.cloud_off, // Icon thể hiện mất kết nối
+                  //             size: 12,
+                  //             color: Colors.orange.shade800,
+                  //           ),
+                  //           const SizedBox(width: 4),
+                  //           Flexible(
+                  //             child: Text(
+                  //               'Lỗi AI (Tự duyệt)',
+                  //               style: TextStyle(
+                  //                 fontSize: 10,
+                  //                 color: Colors.orange.shade900,
+                  //                 fontWeight: FontWeight.w600,
+                  //               ),
+                  //               maxLines: 1,
+                  //               overflow: TextOverflow.ellipsis,
+                  //             ),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ],
 
                   // Admin Reason
                   if (post.status == 'rejected' &&
@@ -944,33 +944,66 @@ class _PostsListScreenState extends State<PostsListScreen> {
                     ),
                   ],
 
-                  // 4. AI Reason
+                  // 4. AI Reason - TEXT
                   if (post.status == 'rejected' &&
-                      post.aiReason != null &&
-                      post.aiReason!.isNotEmpty) ...[
+                      post.aiReasonText != null &&
+                      post.aiReasonText!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Tooltip(
-                        message: 'AI: ${post.aiReason!}',
+                        message: 'AI Text: ${post.aiReasonText!}',
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.smart_toy,
+                              Icons.text_format,
                               size: 12,
                               color: Colors.orange,
                             ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                post.aiReason!,
+                                post.aiReasonText!,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.orange.withValues(alpha: 0.7),
+                                  color: Colors.orange.withValues(alpha: 0.8),
                                   fontStyle: FontStyle.italic,
                                 ),
-                                maxLines: 2,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // 5. AI Reason - IMAGE
+                  if (post.status == 'rejected' &&
+                      post.aiReasonImage != null &&
+                      post.aiReasonImage!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Tooltip(
+                        message: 'AI Image: ${post.aiReasonImage!}',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.image, size: 12, color: Colors.orange),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                post.aiReasonImage!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange.withValues(alpha: 0.8),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                               ),
@@ -1052,7 +1085,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                 },
               ),
               // Approve button (only for rejected/pending posts)
-              if (post.status == 'rejected' || post.status == 'pending_review')
+              if (post.status == 'rejected' || post.status == 'processing')
                 IconButton(
                   icon: const Icon(Icons.check_circle, size: 20),
                   tooltip: 'Duyệt bài viết',
@@ -1060,9 +1093,7 @@ class _PostsListScreenState extends State<PostsListScreen> {
                   onPressed: () => _approvePost(post),
                 ),
               // Reject button (only for active/pending/processing posts)
-              if (post.status == 'active' ||
-                  post.status == 'pending_review' ||
-                  post.status == 'processing')
+              if (post.status == 'active' || post.status == 'processing')
                 IconButton(
                   icon: const Icon(Icons.block, size: 20),
                   tooltip: 'Từ chối bài viết',
@@ -1087,7 +1118,9 @@ class _PostsListScreenState extends State<PostsListScreen> {
   Future<void> _approvePost(Post post) async {
     final isOverridingAdmin =
         post.adminReason != null && post.adminReason!.isNotEmpty;
-    final isOverridingAI = post.aiReason != null && post.aiReason!.isNotEmpty;
+    final isOverridingAI =
+        (post.aiReasonText != null && post.aiReasonText!.isNotEmpty) ||
+        (post.aiReasonImage != null && post.aiReasonImage!.isNotEmpty);
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -1108,6 +1141,8 @@ class _PostsListScreenState extends State<PostsListScreen> {
           .update({
             'status': 'active',
             'adminReason': null, // Clear any previous admin reason
+            'aiReasonText': null, // Clear AI text reason
+            'aiReasonImage': null, // Clear AI image reason
             'moderatedBy': 'admin', // Mark as admin-approved
             'moderatedAt': FieldValue.serverTimestamp(),
           });
