@@ -11,6 +11,7 @@ const admin = require("firebase-admin");
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const axios = require("axios");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const vision = require("@google-cloud/vision");
 
 // AI Server URL
 const AI_SERVER_URL = "https://peripherally-subovoid-doug.ngrok-free.dev/predict";
@@ -20,6 +21,9 @@ admin.initializeApp();
 
 // Set global options for all functions
 setGlobalOptions({region: "asia-southeast1", maxInstances: 10});
+
+// Initialize Google Vision Client
+const visionClient = new vision.ImageAnnotatorClient();
 
 /**
  * 1. Set Admin Claim
@@ -275,85 +279,85 @@ exports.deleteUserAuth = onCall(async (request) => {
 /**
  * 7. AI Post's Text Check
  */
-exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
-  const snapshot = event.data;
-  const postId = event.params.postId;
+// exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
+//   const snapshot = event.data;
+//   const postId = event.params.postId;
 
-  // if no snapshot, exit
-  if (!snapshot) {
-    return;
-  }
+//   // if no snapshot, exit
+//   if (!snapshot) {
+//     return;
+//   }
 
-  // get post data
-  const postData = snapshot.data();
-  // get post text
-  const text = postData.postText || "";
+//   // get post data
+//   const postData = snapshot.data();
+//   // get post text
+//   const text = postData.postText || "";
 
-  // Check if post is a reshare or original post
-  const postType = postData.originalPostId ? "RESHARE" : "POST";
+//   // Check if post is a reshare or original post
+//   const postType = postData.originalPostId ? "RESHARE" : "POST";
 
-  // if no text, set status to active
-  if (!text) {
-    return snapshot.ref.update({status: "active"});
-  }
+//   // if no text, set status to active
+//   if (!text) {
+//     return snapshot.ref.update({status: "active"});
+//   }
 
-  // start time
-  const startTime = Date.now();
-  console.log(`[START] [${postType}] Bắt đầu gửi bài ${postId} tới AI...`);
+//   // start time
+//   const startTime = Date.now();
+//   console.log(`[START] [${postType}] Bắt đầu gửi bài ${postId} tới AI...`);
 
-  try {
-    console.log(`Đang gửi bài ${postId} tới AI Server...`);
-    // call AI server with timeout of 10 seconds
-    const response = await axios.post(AI_SERVER_URL, {
-      text: text,
-    }, {timeout: 10000});
+//   try {
+//     console.log(`Đang gửi bài ${postId} tới AI Server...`);
+//     // call AI server with timeout of 10 seconds
+//     const response = await axios.post(AI_SERVER_URL, {
+//       text: text,
+//     }, {timeout: 10000});
 
-    // end time
-    const endTime = Date.now();
-    // Calculate execution time
-    const executionTime = endTime - startTime;
+//     // end time
+//     const endTime = Date.now();
+//     // Calculate execution time
+//     const executionTime = endTime - startTime;
 
-    // Print the log (You will see this in the Console). measured in milliseconds
-    console.log(`[PERFORMANCE] AI phản hồi trong: ${executionTime}ms`);
+//     // Print the log (You will see this in the Console). measured in milliseconds
+//     console.log(`[PERFORMANCE] AI phản hồi trong: ${executionTime}ms`);
 
-    // get AI result
-    const aiResult = response.data;
-    // process AI result
-    if (aiResult.is_toxic === true) {
-      // if toxic, set status to rejected with reason
-      await snapshot.ref.update({
-        status: "rejected",
-        aiReason: aiResult.reason,
-        moderatedBy: "AI",
-        moderatedAt: admin.firestore.Timestamp.now(),
-      });
-      console.log(`AI chặn bài ${postId} vì: ${aiResult.reason} (mất ${executionTime}ms)`);
-    } else {
-      // if not toxic, set status to active
-      await snapshot.ref.update({
-        status: "active",
-        aiReason: null,
-        moderatedBy: "AI",
-        moderatedAt: admin.firestore.Timestamp.now(),
-      });
-      console.log(`AI duyệt sạch (mất ${executionTime}ms)`);
-    }
-  } catch (error) {
-    // Measure the time even if there is an error (to know how long it takes to die)
-    // for example, if it takes exactly 5000ms, it's due to a timeout).
-    const errorTime = Date.now() - startTime;
-    console.error(`[ERROR] Lỗi gọi AI Server sau ${errorTime}ms:`, error.message);
+//     // get AI result
+//     const aiResult = response.data;
+//     // process AI result
+//     if (aiResult.is_toxic === true) {
+//       // if toxic, set status to rejected with reason
+//       await snapshot.ref.update({
+//         status: "rejected",
+//         aiReason: aiResult.reason,
+//         moderatedBy: "AI",
+//         moderatedAt: admin.firestore.Timestamp.now(),
+//       });
+//       console.log(`AI chặn bài ${postId} vì: ${aiResult.reason} (mất ${executionTime}ms)`);
+//     } else {
+//       // if not toxic, set status to active
+//       await snapshot.ref.update({
+//         status: "active",
+//         aiReason: null,
+//         moderatedBy: "AI",
+//         moderatedAt: admin.firestore.Timestamp.now(),
+//       });
+//       console.log(`AI duyệt sạch (mất ${executionTime}ms)`);
+//     }
+//   } catch (error) {
+//     // Measure the time even if there is an error (to know how long it takes to die)
+//     // for example, if it takes exactly 10000ms, it's due to a timeout).
+//     const errorTime = Date.now() - startTime;
+//     console.error(`[ERROR] Lỗi gọi AI Server sau ${errorTime}ms:`, error.message);
 
-    // On error, Auto-Approve the post to avoid pending content for users
-    await snapshot.ref.update({
-      status: "active",
-      moderatedBy: "system_failover",
-      aiReason: "Dich vụ AI lỗi -> tự động duyệt",
-      moderatedAt: admin.firestore.Timestamp.now(),
-    });
-    console.log(` Đã Auto-Approve bài viết do lỗi.`);
-  }
-});
+//     // On error, Auto-Approve the post to avoid pending content for users
+//     await snapshot.ref.update({
+//       status: "active",
+//       moderatedBy: "system_failover",
+//       aiReason: "Dich vụ AI lỗi -> tự động duyệt",
+//       moderatedAt: admin.firestore.Timestamp.now(),
+//     });
+//     console.log(` Đã Auto-Approve bài viết do lỗi.`);
+//   }
+// });
 
 /**
  * 8. Check Post Update (when user updates post text)
@@ -460,5 +464,150 @@ exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
       moderatedAt: admin.firestore.Timestamp.now(),
     });
     console.log(` Đã Auto-Approve bài viết do lỗi.`);
+  }
+});
+
+/**
+ * 9. AI Check Content (Text & Image)
+ */
+exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => {
+  const snapshot = event.data;
+  const postId = event.params.postId;
+
+  // if no snapshot, exit
+  if (!snapshot) {
+    return;
+  }
+
+  // get post data
+  const postData = snapshot.data();
+  // get post text
+  const text = postData.postText || "";
+  // get image urls
+  const image = postData.postUrl || "";
+
+  // if don't have both text + image -> Active
+  if (!text && !image) {
+    return snapshot.ref.update({status: "active"});
+  }
+
+  console.log(`[START] Bắt đầu kiểm duyệt bài ${postId}...`);
+  const startTime = Date.now();
+
+  // Variables for storing test results
+  let isTextToxic = false;
+  let textReason = "";
+
+  let isImageUnsafe = false;
+  let imageReason = "";
+
+  // RUN BOTH CHECKS SIMULTANEOUSLY (Promise.all)
+  // Text & Image are Checked in Parallel
+
+  const checkTextPromise = async ()=>{
+    // text == null => skip
+    if (!text) return;
+
+    try {
+      console.log(`Checking Text...`);
+      // call AI server with timeout of 10 seconds
+      const response = await axios.post(AI_SERVER_URL, {text: text}, {timeout: 10000});
+      // get AI result
+      const aiResult = response.data;
+
+      // process AI result
+      // if toxic
+      if (aiResult.is_toxic === true) {
+        isTextToxic = true;
+        textReason = aiResult.reason || "Vi phạm tiêu chuẩn văn bản";
+      }
+    } catch (error) {
+      // If Server text error, log the error
+      console.error(`[ERROR] Lỗi server Text: ${error.message}`);
+    }
+  };
+
+  const checkImagePromise = async ()=>{
+    // image == null => skip
+    if (!image) return;
+
+    try {
+      console.log(`Checking Image...`);
+      // Use Google Vision to check image safety
+      const [result] = await visionClient.safeSearchDetection(image);
+      const detections = result.safeSearchAnnotation;
+
+      console.log(`Kết quả Vision chi tiết cho bài ${postId}:`, JSON.stringify(detections));
+
+      // Check the likelihood of unsafe content
+      // LIKELY: khả năng cao
+      // VERY_LIKELY: rất chắc chắn
+      // POSSIBLE: có thể/ nghi ngờ
+      // UNLIKELY: không có khả năng
+      // VERY_UNLIKELY: rất không có khả năng
+      // UNKNOWN: không xác định
+
+      // const isUnsafe = (likelihood) => {
+      //   return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
+      // };
+
+      const isViolenceOrMedicalUnsafe = (likelihood) => {
+        return likelihood === "POSSIBLE" || likelihood === "LIKELY";
+      };
+
+      const isAdultUnsafe = (likelihood) => {
+        return likelihood === "POSSIBLE" || likelihood === "VERY_LIKELY";
+      };
+
+      if (isAdultUnsafe(detections.adult)) imageReason = "Chứa nội dung người lớn (18+)";
+      else if (isViolenceOrMedicalUnsafe(detections.violence)) imageReason = "Chứa nội dung bạo lực (Vũ khí/Đánh nhau)";
+      else if (isAdultUnsafe(detections.racy)) imageReason = "Chứa nội dung gợi cảm/hở hang";
+      else if (isViolenceOrMedicalUnsafe(detections.medical)) imageReason = "Chứa nội dung máu me/y tế";
+      else if (isAdultUnsafe(detections.spoof)) imageReason = "Chứa nội dung giả mạo";
+
+      if (imageReason) {
+        isImageUnsafe = true;
+      }
+    } catch (error) {
+      // If Vision API error, log the error
+      console.error(`[ERROR] Lỗi Google Vision: ${error.message}`);
+    }
+  };
+    // Run both checks in parallel
+  await Promise.all([checkTextPromise(), checkImagePromise()]);
+
+  // After both checks are done, decide the final status
+  const endTime = Date.now();
+  const executionTime = endTime - startTime;
+  console.log(`[PERFORMANCE] Kiểm duyệt hoàn tất trong: ${executionTime}ms`);
+
+  const isRejected = isTextToxic || isImageUnsafe;
+  let finalReason = null;
+
+  //
+  if (isRejected) {
+    const reasons = [];
+    if (isTextToxic) reasons.push(`Văn bản: ${textReason}`);
+    if (isImageUnsafe) reasons.push(`Hình ảnh: ${imageReason}`);
+    // join text + image reasons
+    finalReason = reasons.join(" | ");
+    console.log(` BLOCK Bài ${postId}, lý do: ${finalReason}`);
+  } else {
+    console.log(`ACTIVE Bài ${postId}, Nội dung sạch.`);
+  }
+
+  // Update post status based on checks
+  try {
+    await snapshot.ref.update({
+      status: isRejected ? "rejected" : "active",
+      reason: finalReason, // null if active, string if rejected
+      moderatedBy: "AI",
+      moderatedAt: admin.firestore.Timestamp.now(),
+      imageChecked: !!image, // mark if image was checked
+      textChecked: !!text, // mark if text was checked
+    });
+    console.log(`[DONE] Hoàn tất sau ${executionTime}ms`);
+  } catch (error) {
+    console.error(`[ERROR] Lỗi cập nhật trạng thái bài ${postId}: ${error.message}`);
   }
 });
