@@ -41,7 +41,10 @@ const Map<String, String> fieldLabels = {
 
   // Moderation Info
   'status': 'Trạng thái hiện tại',
-  'aiReason': 'Lý do AI chặn',
+  'aiReasonText': 'Lý do AI chặn (Văn bản)',
+  'aiReasonImage': 'Lý do AI chặn (Hình ảnh)',
+  'textChecked': 'Đã kiểm tra Văn bản bởi AI',
+  'imageChecked': 'Đã kiểm tra Hình ảnh bởi AI',
   'adminReason': 'Lý do Admin chặn',
   'moderatedBy': 'Người kiểm duyệt',
   'moderatedAt': 'Thời gian kiểm duyệt',
