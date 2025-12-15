@@ -483,11 +483,15 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   const postData = snapshot.data();
   // get post text
   const text = postData.postText || "";
-  // get image urls
-  const image = postData.postUrl || "";
+
+  // check the post is reshare or original
+  const isReshare = postData.originalPostId ? true : false;
+  // if the post is a reshare, skip checking image
+  const image = isReshare ? "" : (postData.postImageUrl || "");
 
   // if don't have both text + image -> Active
   if (!text && !image) {
+    console.log(`Bài ${postId} không có văn bản và hình ảnh. Bỏ qua kiểm duyệt AI.`);
     return snapshot.ref.update({status: "active"});
   }
 
@@ -626,6 +630,20 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     // join text + image reasons
     finalReason = reasons.join(" | ");
     console.log(` [BLOCK] Bài ${postId}, lý do: ${finalReason}`);
+
+    if (isReshare && postData.originalPostId) {
+      try {
+        await admin.firestore()
+            .collection("posts")
+            .doc(postData.originalPostId)
+            .update({
+              reshareCount: admin.firestore.FieldValue.increment(-1),
+            });
+        console.log(`[ROLLBACK] Đã hoàn tác lượt chia sẻ cho bài gốc ${postData.originalPostId}`);
+      } catch (error) {
+        console.error(`[ERROR] Lỗi hoàn tác lượt chia sẻ cho bài gốc ${postData.originalPostId}: ${error.message}`);
+      }
+    }
   } else {
     console.log(`[ACTIVE] Bài ${postId}, Nội dung sạch.`);
   }
