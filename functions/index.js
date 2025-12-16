@@ -383,7 +383,9 @@ exports.deleteUserAuth = onCall(async (request) => {
 //   }
 
 //   // If previous update was failed due to AI rollback, skip check to avoid loop
-//   if (afterData.status === "active" && afterData.updateStatus === "failed" && afterData.moderatedBy === "AI_Rollback") {
+//   if (afterData.status === "active"
+// && afterData.updateStatus === "failed"
+// && afterData.moderatedBy === "AI_Rollback") {
 //     console.log(`Bỏ qua check vì đây là thao tác Rollback của hệ thống.`);
 //     return;
 //   }
@@ -487,7 +489,7 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   // check the post is reshare or original
   const isReshare = postData.originalPostId ? true : false;
   // if the post is a reshare, skip checking image
-  const image = isReshare ? "" : (postData.postImageUrl || "");
+  const image = isReshare ? "" : (postData.postUrl || "");
 
   // if don't have both text + image -> Active
   if (!text && !image) {
@@ -664,3 +666,275 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     console.error(`[ERROR] Lỗi cập nhật trạng thái bài ${postId}: ${error.message}`);
   }
 });
+
+/**
+ * Check Post Update (Text & Image Moderation with Rollback)
+ */
+exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
+  // Get data before and after the update
+  const beforeDoc = event.data.before;
+  const afterDoc = event.data.after;
+  const postId = event.params.postId;
+
+  // get data (json contains content)
+  const beforeData = beforeDoc.data();
+  const afterData = afterDoc.data();
+
+  // Get new text and image
+  const newText = afterData.postText || "";
+  const oldText = beforeData.postText || "";
+
+  const newImage = afterData.postUrl || "";// With reshare, this could be the link to the original image.
+  const oldImage = beforeData.postUrl || "";
+
+  const isTextChanged = newText !== oldText;
+  const isImageChanged = newImage !== oldImage;
+
+  // If neither text nor image changed, exit
+  if (!isTextChanged && !isImageChanged) {
+    console.log(`Bài ${postId} cập nhật nhưng không thay đổi nội dung văn bản hoặc hình ảnh. Bỏ qua kiểm tra AI.`);
+    return;
+  }
+
+  if (afterData.moderatedBy === "AI_Rollback") {
+    console.log(`[SKIP] Bỏ qua kiểm duyệt do đây là thao tác Rollback hệ thống.`);
+    return;
+  }
+
+  console.log(`[UPDATE] Bài ${postId} có thay đổi. Text: ${isTextChanged}, Img: ${isImageChanged}`);
+  const startTime = Date.now();
+
+  // Variables for storing test results
+  let isTextToxic = false;
+  let textReason = null;
+
+  let isImageUnsafe = false;
+  let imageReason = null;
+
+  //
+  let checkError=null;
+
+  // Check Text if changed
+  const checkTextPromise = async ()=>{
+    if (!isTextChanged || !newText) return;
+
+    try {
+      console.log(`Checking Updated Text...`);
+      // call AI server with timeout of 10 seconds
+      const response = await axios.post(AI_SERVER_URL, {text: newText}, {timeout: 10000});
+      const aiResult = response.data;
+
+      // Check if toxic
+      if (aiResult.is_toxic === true) {
+        isTextToxic = true;
+        textReason = aiResult.reason || "Văn bản vi phạm tiêu chuẩn";
+      }
+    } catch (error) {
+      checkError=`Lỗi Server AI Text: ${error.message}`;
+      console.error(`[ERROR] Lỗi Server AI Text: ${error.message}`);
+    }
+  };
+
+  // Check Image if changed
+  const checkImagePromise = async ()=>{
+    if (!isImageChanged || !newImage) return;
+
+    try {
+      console.log(`Checking Updated Image...`);
+      // Use Google Vision to check image safety
+      const [result] = await visionClient.annotateImage({
+        image: {source: {imageUri: newImage}},
+        features: [
+          {type: "SAFE_SEARCH_DETECTION"},
+          {type: "LABEL_DETECTION", maxResults: 10},
+        ],
+      });
+
+      const safeSearch = result.safeSearchAnnotation;
+      const labels = result.labelAnnotations;
+
+      console.log(`Vision SafeSearch:`, JSON.stringify(safeSearch));
+
+      // Check likelihoods
+      const isViolenceUnsafe = (likelihood) => {
+        return likelihood === "POSSIBLE" || likelihood === "LIKELY"|| likelihood === "VERY_LIKELY";
+      };
+
+      const isAdultUnsafe = (likelihood) => {
+        return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
+      };
+
+      if (isAdultUnsafe(safeSearch.adult)) imageReason = "Chứa nội dung người lớn (18+)";
+      else if (isViolenceUnsafe(safeSearch.violence)) imageReason = "Chứa nội dung bạo lực";
+      else if (isAdultUnsafe(safeSearch.racy)) imageReason = "Hình ảnh quá gợi cảm";
+      else if (isViolenceUnsafe(safeSearch.medical)) imageReason = "Hình ảnh máu me/y tế";
+
+      // Check keywords if class 1 didn't catch anything
+      if (!imageReason && labels) {
+        const BLACKLIST_LABELS = [
+          "blood", "bleeding", "injury", "wound",
+          "explosion", "bomb", "grenade",
+          "gun", "firearm", "pistol", "rifle", "weapon", "sword", "knife",
+          "fight", "fighting", "assault", "violence",
+          "horror", "terror",
+        ];
+
+        for (const label of labels) {
+          const labelName = label.description.toLowerCase();
+          const score = label.score;
+
+          if (BLACKLIST_LABELS.some((badWord) => labelName.includes(badWord)) && score > 0.7) {
+            imageReason = `Phát hiện vật thể/nội dung cấm: ${label.description} (${Math.round(score*100)}%)`;
+            break;
+          }
+        }
+      }
+
+      if (imageReason) {
+        isImageUnsafe = true;
+      }
+    } catch (error) {
+      checkError=`Lỗi Google Vision API: ${error.message}`;
+      console.error(`[ERROR] Lỗi Google Vision: ${error.message}`);
+    }
+  };
+
+  // Run checks in parallel
+  await Promise.all([checkTextPromise(), checkImagePromise()]);
+
+  // Final decision
+  const endTime = Date.now();
+  const executionTime = endTime - startTime;
+  console.log(`[PERFORMANCE] Kiểm duyệt cập nhật hoàn tất trong: ${executionTime}ms`);
+
+  const isRejected = isTextToxic || isImageUnsafe;
+
+  // IF REJECTED -> ROLLBACK TO OLD CONTENT
+  if (isRejected) {
+    // Summary of reasons for displaying
+    const reasons = [];
+
+    if (isTextToxic) reasons.push(`Văn bản: ${textReason}`);
+    if (isImageUnsafe) reasons.push(`Hình ảnh: ${imageReason}`);
+    const finalReason = reasons.join("\n");
+
+    console.log(` [BLOCK] UPDATE Bài ${postId} sau cập nhật, lý do: ${finalReason}`);
+    console.log(`Đang Rollback về nội dung an toàn trước đó...`);
+
+    try {
+      // Rollback to old content
+      await afterDoc.ref.update({
+        postText: oldText,
+        postUrl: oldImage,
+        // Keep the status active (because the old post is clean).
+        status: "active",
+        // Mark the update as failed so the client displays the error.
+        updateStatus: "failed",
+        updateError: finalReason,
+
+        // Metadata
+        moderatedBy: "AI_Rollback",
+        moderatedAt: admin.firestore.Timestamp.now(),
+        attemptedUpdateText: isTextChanged ? newText : null, // Save the toxic text that the user intends to edit
+        attemptedUpdateImage: isImageChanged ? newImage : null, // Save the dirty image that the user intends to edit
+        // keep old timestamps
+        lastDateModified: beforeData.lastDateModified,
+        dateUpdated: beforeData.dateUpdated,
+      });
+      console.log(`Đã khôi phục bài viết về trạng thái an toàn trước đó.`);
+    } catch (error) {
+      console.error(`[ERROR] Lỗi rollback bài ${postId}: ${error.message}`);
+    }
+  } else if (checkError) {
+    // IF NOT REJECTED BUT HAD ERRORS DURING AI CHECKING(serveR AI errors,...) => AUTO APPROVE
+
+    // If there was an error during checking, but content is clean
+    console.log(`SYSTEM ERROR: ${checkError}. -> Auto-Approve bài ${postId}.`);
+    try {
+      await afterDoc.ref.update({
+        status: "active",
+        updateStatus: "success",
+        updateError: null,
+        // clear attempted updates
+        aiReasonText: null,
+        aiReasonImage: null,
+        attemptedUpdateText: null,
+        attemptedUpdateImage: null,
+
+        // Metadata
+        moderatedBy: "system_failover",
+        moderatedAt: admin.firestore.Timestamp.now(),
+        // mark what was checked
+        textChecked: !!newText,
+        imageChecked: !!newImage,
+      });
+      console.log(`[AUTO-APPROVE] Hoàn tất sau ${executionTime}ms`);
+    } catch (error) {
+      console.error(`[ERROR] Lỗi auto-approve bài ${postId} vì: ${error.message}`);
+    }
+  } else {
+    // IF CLEAN CONTENT -> APPROVE
+    console.log(`[ACTIVE] Bài ${postId} sau cập nhật, nội dung sạch.`);
+
+    // If image was changed, delete old image from Storage
+    if (isImageChanged && oldImage) {
+      // Delete old image from Storage to save space
+      deleteImageFromStorage(oldImage).catch((error)=>{
+        console.error(`[CLEANUP ERROR] Lỗi xóa ảnh cũ sau cập nhật bài ${postId}: ${error.message}`);
+      });
+    }
+
+    try {
+      await afterDoc.ref.update({
+        status: "active",
+        updateStatus: "success",
+        updateError: null,
+        // delete old reasons (if any)
+        aiReasonText: null,
+        aiReasonImage: null,
+
+        // clear attempted updates
+        attemptedUpdateText: null,
+        attemptedUpdateImage: null,
+
+        // Metadata
+        moderatedBy: "AI_Update",
+        moderatedAt: admin.firestore.Timestamp.now(),
+        // mark what was checked
+        textChecked: !!newText,
+        imageChecked: !!newImage,
+      });
+      console.log(`[DONE] Hoàn tất sau ${executionTime}ms`);
+    } catch (error) {
+      console.error(`[ERROR] Lỗi cập nhật trạng thái đã duyệt cho bài ${postId}: ${error.message}`);
+    }
+  }
+});
+
+// Utility function to delete image from Firebase Storage
+async function deleteImageFromStorage(imageUrl) {
+  if (!imageUrl) return;
+
+  try {
+    // URLs usually look like this: https://firebasestorage.googleapis.com/.../o/posts%2Fabc.jpg?alt=media...
+    // Need to get the "posts/abc.jpg" part
+    const bucket = admin.storage().bucket();
+
+    // Extract the path after the "/o/"
+    const parts = imageUrl.split("/o/");
+    if (parts.length < 2) return;
+
+    // Get the path and remove query parameters (?alt=...)
+    let filePath = parts[1].split("?")[0];
+
+    // Decode (cuz URLs are encoded from / to %2F)
+    filePath = decodeURIComponent(filePath);
+
+    console.log(`[CLEANUP] Đang xóa ảnh cũ: ${filePath}`);
+    await bucket.file(filePath).delete();
+    console.log(`[CLEANUP] Đã xóa thành công.`);
+  } catch (error) {
+    // Nếu ảnh không tồn tại hoặc lỗi, chỉ log ra chứ không làm crash app
+    console.warn(`[CLEANUP WARNING] Không thể xóa ảnh cũ: ${error.message}`);
+  }
+}
