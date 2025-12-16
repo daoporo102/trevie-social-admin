@@ -34,7 +34,7 @@ class FirestoreMethod {
     if (!await _checkNetwork()) {
       return "Không có kết nối Internet";
     }
-    
+
     try {
       // Validate proImage before proceeding
       if (profImage.isEmpty) {
@@ -106,22 +106,28 @@ class FirestoreMethod {
         'postText': postText,
         'dateUpdated': Timestamp.fromDate(now),
         'lastDateModified': Timestamp.fromDate(now),
+        'updateStatus': null, 
+        'updateError': null,
+        'moderatedBy': null,
       };
 
       String? newPhotoUrl;
 
       // Only update image if user selected a new one
       if (file != null) {
-        // Delete the old image from storage if it exists
-        if (existingImageUrl != null && existingImageUrl.isNotEmpty) {
-          try {
-            await StorageMethods().deleteImageFromStorage(existingImageUrl);
-          } catch (storageError) {
-            avoidPrint(
-              "Storage deletion warning (old image may be missing): $storageError",
-            );
-          }
-        }
+        // -- THIS SECTION HAS BEEN REMOVED TO BE SENT TO THE SERVER FOR PROCESSING --
+
+        // // Delete the old image from storage if it exists
+
+        // if (existingImageUrl != null && existingImageUrl.isNotEmpty) {
+        //   try {
+        //     await StorageMethods().deleteImageFromStorage(existingImageUrl);
+        //   } catch (storageError) {
+        //     avoidPrint(
+        //       "Storage deletion warning (old image may be missing): $storageError",
+        //     );
+        //   }
+        // }
 
         // Upload the new image to storage
         newPhotoUrl = await StorageMethods().uploadImageToStorage(

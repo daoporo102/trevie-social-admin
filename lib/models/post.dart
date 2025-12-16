@@ -28,6 +28,7 @@ class Post {
   final String? updateStatus;
   final String? updateError;
   final String? attemptedUpdateText;
+  final String? attemptedUpdateImage;
   final String? aiReasonText;
   final String? aiReasonImage;
   final bool? textChecked;
@@ -59,6 +60,7 @@ class Post {
     this.updateStatus,
     this.updateError,
     this.attemptedUpdateText,
+    this.attemptedUpdateImage,
     this.aiReasonText,
     this.aiReasonImage,
     this.textChecked = false,
@@ -95,6 +97,7 @@ class Post {
     "updateStatus": updateStatus,
     "updateError": updateError,
     "attemptedUpdateText": attemptedUpdateText,
+    "attemptedUpdateImage": attemptedUpdateImage,
     "aiReasonText": aiReasonText,
     "aiReasonImage": aiReasonImage,
     "textChecked": textChecked,
@@ -154,6 +157,7 @@ class Post {
       updateStatus: snapshotData['updateStatus'],
       updateError: snapshotData['updateError'],
       attemptedUpdateText: snapshotData['attemptedUpdateText'],
+      attemptedUpdateImage: snapshotData['attemptedUpdateImage'],
       aiReasonText: snapshotData['aiReasonText'],
       aiReasonImage: snapshotData['aiReasonImage'],
       textChecked: snapshotData['textChecked'] ?? false,

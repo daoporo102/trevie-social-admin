@@ -53,4 +53,5 @@ const Map<String, String> fieldLabels = {
   'updateStatus': 'Trạng thái Cập nhật',
   'updateError': 'Lỗi cập nhật (Lý do)',
   'attemptedUpdateText': 'Nội dung định sửa (Vi phạm)',
+  'attemptedUpdateImage': 'Hình ảnh định sửa (Vi phạm)',  
 };
