@@ -51,6 +51,7 @@ class PostDetailDialog extends StatelessWidget {
         'updateStatus',
         'updateError',
         'attemptedUpdateText',
+        'attemptedUpdateImage',
       ].contains(key)) {
         moderationInfo[key] = value;
       } else if (['likes', 'likesCount', 'reshareCount'].contains(key)) {
