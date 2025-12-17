@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:social_media_admin/models/violation_log.dart';
 import 'package:social_media_admin/services/admin_firestore_methods.dart';
 import 'package:social_media_admin/utils/colors.dart';
+import 'package:social_media_admin/widgets/semi_circle_score_widget.dart';
 
 class ViolationDetailModal extends StatelessWidget {
   final ViolationLog log;
@@ -115,11 +116,13 @@ class ViolationDetailModal extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildScoreBadge("Tổng hợp", log.aiConfidence),
-            if (log.textScore > 0) _buildScoreBadge("Văn bản", log.textScore),
+            SemiCircleScoreWidget(title: "Tổng hợp", score: log.aiConfidence),
+            if (log.textScore > 0)
+              SemiCircleScoreWidget(title: "Văn bản", score: log.textScore),
             if (log.imageScore > 0)
-              _buildScoreBadge("Hình ảnh", log.imageScore),
+              SemiCircleScoreWidget(title: "Hình ảnh", score: log.imageScore),
           ],
         ),
       ],
@@ -278,43 +281,6 @@ class ViolationDetailModal extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildScoreBadge(String title, double score) {
-    Color color = score > 0.8
-        ? errorBackgroundColor
-        : (score > 0.5 ? Colors.orange : appPrimaryColor);
-    return Column(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: secondaryColor,
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: color, width: 3),
-          ),
-          child: Center(
-            child: Text(
-              "${(score * 100).toStringAsFixed(0)}%",
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 

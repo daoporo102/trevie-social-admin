@@ -6,6 +6,7 @@ import 'package:social_media_admin/models/violation_log.dart';
 import 'package:social_media_admin/screens/violation_detail_modal.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
+import 'package:social_media_admin/widgets/semi_circle_score_widget.dart';
 
 class AdminViolationScreen extends StatefulWidget {
   const AdminViolationScreen({super.key});
@@ -99,22 +100,7 @@ class _AdminViolationScreenState extends State<AdminViolationScreen> {
       cells: [
         // Severity
         DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: severityColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: severityColor.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              "${(log.aiConfidence * 100).toStringAsFixed(2)}%",
-              style: TextStyle(
-                color: severityColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
+          SemiCircleScoreWidget(title: 'Mức độ', score: log.aiConfidence),
         ),
         // Reason
         DataCell(
