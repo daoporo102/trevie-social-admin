@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:social_media_admin/screens/admin_violation_screen.dart';
 import 'package:social_media_admin/screens/comments/comments_list_screen.dart';
 import 'package:social_media_admin/screens/dashboard_screen.dart';
 import 'package:social_media_admin/screens/login_screen.dart';
@@ -59,6 +60,7 @@ final router = GoRouter(
         ),
         GoRoute(path: '/users', builder: (context, state) => UsersListScreen()),
         GoRoute(path: '/posts', builder: (context, state) => PostsListScreen()),
+        GoRoute(path: '/violations', builder: (context, state) => AdminViolationScreen()),
         GoRoute(
           path: '/comments',
           builder: (context, state) => CommentsListScreen(),

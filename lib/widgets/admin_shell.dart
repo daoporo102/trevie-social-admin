@@ -196,6 +196,12 @@ class _AdminShellState extends State<AdminShell> {
                   isCollapsed: isActuallyCollapsed,
                 ),
                 _buildMenuItem(
+                  icon: Icons.report,
+                  title: 'Vi phạm',
+                  route: '/violations',
+                  isCollapsed: isActuallyCollapsed,
+                ),
+                _buildMenuItem(
                   icon: Icons.settings,
                   title: 'Cài đặt',
                   route: '/settings',

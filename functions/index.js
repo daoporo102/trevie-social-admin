@@ -25,6 +25,30 @@ setGlobalOptions({region: "asia-southeast1", maxInstances: 10});
 // Initialize Google Vision Client
 const visionClient = new vision.ImageAnnotatorClient();
 
+const VIETNAMESE_LABELS = {
+  "blood": "máu",
+  "bleeding": "chảy máu",
+  "injury": "thương tích",
+  "wound": "vết thương",
+  "explosion": "chất nổ",
+  "bomb": "bom",
+  "grenade": "lựu đạn",
+  "gun": "súng",
+  "firearm": "súng",
+  "pistol": "súng lục",
+  "rifle": "súng trường",
+  "weapon": "vũ khí",
+  "sword": "kiếm",
+  "knife": "dao",
+  "fight": "đánh nhau",
+  "fighting": "đánh nhau",
+  "assault": "tấn công",
+  "violence": "bạo lực",
+  "horror": "kinh dị",
+  "terror": "khủng bố",
+  "air gun": "súng",
+};
+
 /**
  * 1. Set Admin Claim
  */
@@ -275,202 +299,8 @@ exports.deleteUserAuth = onCall(async (request) => {
   }
 });
 
-
 /**
- * 7. AI Post's Text Check
- */
-// exports.checkPostText = onDocumentCreated("posts/{postId}", async (event) => {
-//   const snapshot = event.data;
-//   const postId = event.params.postId;
-
-//   // if no snapshot, exit
-//   if (!snapshot) {
-//     return;
-//   }
-
-//   // get post data
-//   const postData = snapshot.data();
-//   // get post text
-//   const text = postData.postText || "";
-
-//   // Check if post is a reshare or original post
-//   const postType = postData.originalPostId ? "RESHARE" : "POST";
-
-//   // if no text, set status to active
-//   if (!text) {
-//     return snapshot.ref.update({status: "active"});
-//   }
-
-//   // start time
-//   const startTime = Date.now();
-//   console.log(`[START] [${postType}] Bắt đầu gửi bài ${postId} tới AI...`);
-
-//   try {
-//     console.log(`Đang gửi bài ${postId} tới AI Server...`);
-//     // call AI server with timeout of 10 seconds
-//     const response = await axios.post(AI_SERVER_URL, {
-//       text: text,
-//     }, {timeout: 10000});
-
-//     // end time
-//     const endTime = Date.now();
-//     // Calculate execution time
-//     const executionTime = endTime - startTime;
-
-//     // Print the log (You will see this in the Console). measured in milliseconds
-//     console.log(`[PERFORMANCE] AI phản hồi trong: ${executionTime}ms`);
-
-//     // get AI result
-//     const aiResult = response.data;
-//     // process AI result
-//     if (aiResult.is_toxic === true) {
-//       // if toxic, set status to rejected with reason
-//       await snapshot.ref.update({
-//         status: "rejected",
-//         aiReason: aiResult.reason,
-//         moderatedBy: "AI",
-//         moderatedAt: admin.firestore.Timestamp.now(),
-//       });
-//       console.log(`AI chặn bài ${postId} vì: ${aiResult.reason} (mất ${executionTime}ms)`);
-//     } else {
-//       // if not toxic, set status to active
-//       await snapshot.ref.update({
-//         status: "active",
-//         aiReason: null,
-//         moderatedBy: "AI",
-//         moderatedAt: admin.firestore.Timestamp.now(),
-//       });
-//       console.log(`AI duyệt sạch (mất ${executionTime}ms)`);
-//     }
-//   } catch (error) {
-//     // Measure the time even if there is an error (to know how long it takes to die)
-//     // for example, if it takes exactly 10000ms, it's due to a timeout).
-//     const errorTime = Date.now() - startTime;
-//     console.error(`[ERROR] Lỗi gọi AI Server sau ${errorTime}ms:`, error.message);
-
-//     // On error, Auto-Approve the post to avoid pending content for users
-//     await snapshot.ref.update({
-//       status: "active",
-//       moderatedBy: "system_failover",
-//       aiReason: "Dich vụ AI lỗi -> tự động duyệt",
-//       moderatedAt: admin.firestore.Timestamp.now(),
-//     });
-//     console.log(` Đã Auto-Approve bài viết do lỗi.`);
-//   }
-// });
-
-/**
- * 8. Check Post Update (when user updates post text)
- */
-// exports.checkPostUpdate = onDocumentUpdated("posts/{postId}", async (event) => {
-//   // Get data before and after the update
-//   const beforeDoc = event.data.before;
-//   const afterDoc = event.data.after;
-//   const postId = event.params.postId;
-
-//   // get data (json contains content)
-//   const beforeData = beforeDoc.data();
-//   const afterData = afterDoc.data();
-
-//   // Get new text
-//   const newText = afterData.postText || "";
-//   const oldText = beforeData.postText || "";
-
-//   // If text hasn't changed, exit
-//   if (newText === oldText) {
-//     console.log(`Bài ${postId} cập nhật nhưng không thay đổi nội dung văn bản. Bỏ qua kiểm tra AI.`);
-//     return;
-//   }
-
-//   // If previous update was failed due to AI rollback, skip check to avoid loop
-//   if (afterData.status === "active"
-// && afterData.updateStatus === "failed"
-// && afterData.moderatedBy === "AI_Rollback") {
-//     console.log(`Bỏ qua check vì đây là thao tác Rollback của hệ thống.`);
-//     return;
-//   }
-
-//   // If text changed, proceed to check with AI
-//   console.log(`[UPDATE] Bài ${postId} đã thay đổi nội dung văn bản. Gửi lại tới AI để kiểm tra...`);
-
-//   if (!newText) {
-//     return afterDoc.ref.update({status: "active"});
-//   }
-
-//   // start time
-//   const startTime = Date.now();
-//   console.log(`[START] Bắt đầu gửi bài ${postId} tới AI...`);
-
-//   try {
-//     console.log(`Đang gửi bài ${postId} tới AI Server...`);
-//     // call AI server with timeout of 10 seconds
-//     const response = await axios.post(AI_SERVER_URL, {
-//       text: newText,
-//     }, {timeout: 10000});
-
-//     // end time
-//     const endTime = Date.now();
-//     // Calculate execution time
-//     const executionTime = endTime - startTime;
-
-//     // Print the log (You will see this in the Console). measured in milliseconds
-//     console.log(`[PERFORMANCE] AI phản hồi trong: ${executionTime}ms`);
-
-//     // get AI result
-//     const aiResult = response.data;
-//     // process AI result
-//     if (aiResult.is_toxic === true) {
-//       // if toxic, rollback to old text and set status to active
-//       console.log(`AI phát hiện nội dung độc hại khi Update: ${aiResult.reason}`);
-
-//       await afterDoc.ref.update({
-//         postText: oldText,
-//         status: "active",
-//         // update failed
-//         updateStatus: "failed",
-//         updateError: `${aiResult.reason}`,
-//         attemptedUpdateText: newText,
-//         // get old time
-//         lastDateModified: beforeData.lastDateModified,
-//         dateUpdated: beforeData.dateUpdated,
-//         // Update time check
-//         moderatedAt: admin.firestore.Timestamp.now(),
-//         moderatedBy: "AI_Rollback",
-//       });
-//       console.log(`AI chặn bài ${postId} vì: ${aiResult.reason} (mất ${executionTime}ms)`);
-//       console.log(`Đã khôi phục bài viết về trạng thái cũ an toàn.`);
-//     } else {
-//       // if not toxic, set status to active
-//       await afterDoc.ref.update({
-//         status: "active",
-//         aiReasonText: null,
-//         updateStatus: "success",
-//         updateError: null,
-//         attemptedUpdateText: null,
-//         moderatedBy: "AI_Update",
-//         moderatedAt: admin.firestore.Timestamp.now(),
-//       });
-//       console.log(`AI duyệt sạch (mất ${executionTime}ms)`);
-//     }
-//   } catch (error) {
-//     // Measure the time even if there is an error (to know how long it takes to die)
-//     // for example, if it takes exactly 10000ms, it's due to a timeout).
-//     const errorTime = Date.now() - startTime;
-//     console.error(`[ERROR] Lỗi gọi AI Server sau ${errorTime}ms:`, error.message);
-
-//     // On error, Auto-Approve the post to avoid pending content for users
-//     await afterDoc.ref.update({
-//       status: "active",
-//       moderatedBy: "system_failover",
-//       aiReasonText: "Dich vụ AI lỗi -> tự động duyệt",
-//       moderatedAt: admin.firestore.Timestamp.now(),
-//     });
-//     console.log(` Đã Auto-Approve bài viết do lỗi.`);
-//   }
-// });
-
-/**
- * 9. AI Check Content (Text & Image)
+ * AI Check Content (Text & Image)
  */
 exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => {
   const snapshot = event.data;
@@ -503,9 +333,14 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   // Variables for storing test results
   let isTextToxic = false;
   let textReason = null;
+  let textScore = 0.0;
 
   let isImageUnsafe = false;
   let imageReason = null;
+  let imageScore = 0.0;
+
+  // Violation Labels
+  const violationLabels = [];
 
   // RUN BOTH CHECKS SIMULTANEOUSLY (Promise.all)
   // Text & Image are Checked in Parallel
@@ -527,6 +362,8 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       if (aiResult.is_toxic === true) {
         isTextToxic = true;
         textReason = aiResult.reason || "Vi phạm tiêu chuẩn văn bản";
+        textScore = 0.97; // Fixed score for now
+        violationLabels.push("toxic_text");
       }
     } catch (error) {
       // If Server text error, log the error
@@ -565,23 +402,37 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       // VERY_UNLIKELY: rất không có khả năng
       // UNKNOWN: không xác định
 
-      // CLASS 1: CHECK SAFE SEARCH
-      const isViolenceUnsafe = (likelihood) => {
-        return likelihood === "POSSIBLE" || likelihood === "LIKELY"|| likelihood === "VERY_LIKELY";
-      };
+      // CLASS 1: SCORING SAFE SEARCH
+      const adultScore = getVisionScore(safeSearch.adult);
+      const violenceScore = getVisionScore(safeSearch.violence);
+      const sexualScore = getVisionScore(safeSearch.racy);
+      const medicalScore = getVisionScore(safeSearch.medical);
 
-      const isAdultUnsafe = (likelihood) => {
-        return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
-      };
+      // Blocking threshold
+      const THRESHOLD_LIKELY = 0.75;
+      const THRESHOLD_POSSIBLE = 0.50;
 
-      if (isAdultUnsafe(safeSearch.adult)) imageReason = "Chứa nội dung người lớn (18+)";
-      else if (isViolenceUnsafe(safeSearch.violence)) imageReason = "Chứa nội dung bạo lực";
-      else if (isAdultUnsafe(safeSearch.racy)) imageReason = "Hình ảnh quá gợi cảm";
-      else if (isViolenceUnsafe(safeSearch.medical)) imageReason = "Hình ảnh máu me/y tế";
+      // Determine if image is unsafe based on scores & push violation labels
+      if (adultScore >= THRESHOLD_LIKELY) {
+        imageReason = "Chứa nội dung người lớn (18+)";
+        violationLabels.push("adult");
+      } else if (violenceScore >= THRESHOLD_POSSIBLE) {
+        imageReason = "Chứa nội dung bạo lực";
+        violationLabels.push("violence");
+      } else if (sexualScore >= THRESHOLD_LIKELY) {
+        imageReason = "Hình ảnh quá gợi cảm";
+        violationLabels.push("sexual/racy");
+      } else if (medicalScore >= THRESHOLD_POSSIBLE) {
+        imageReason = "Hình ảnh máu me/y tế";
+        violationLabels.push("medical/blood");
+      }
 
       // CLASS 2: CHECK KEYWORDS (LABEL)
       // If class 1 hasn't caught it yet, use class 2 to scan for forbidden keywords.
-      if (!imageReason && labels) {
+
+      // Calculate label score
+      let labelMaxScore = 0.0;
+      if (labels) {
         // Define forbidden keywords
         const BLACKLIST_LABELS = [
           "blood", "bleeding", "injury", "wound", // Blood, injury
@@ -596,13 +447,31 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
           const labelName = label.description.toLowerCase();
           const score = label.score; // Accuracy (0.0 - 1.0)
 
+          // Find if label matches any bad word
+          const matchedBadWords= BLACKLIST_LABELS.find((badWord) => labelName.includes(badWord));
+
           // Check if label is in the blacklist
-          if (BLACKLIST_LABELS.some((badWord) => labelName.includes(badWord)) && score > 0.7) {
-            imageReason = `Phát hiện vật thể/nội dung cấm: ${label.description} (${Math.round(score*100)}%)`;
-            break; // block
+          if (matchedBadWords && score > 0.7) {
+            // If found, set reason and score
+            if (!imageReason) {
+              const translatedLabel = VIETNAMESE_LABELS[matchedBadWords] || label.description;
+              imageReason = `Phát hiện vật thể/nội dung cấm: ${translatedLabel}`;
+            }
+
+            // Always push the log so the admin knows there are guns/knives... even if blocked for other reasons.
+            violationLabels.push(`banned_object:${label.description}`);
+
+            // Update max label score
+            if (score > labelMaxScore) {
+              labelMaxScore = score;
+            }
           }
         }
       }
+
+      // Final image score is the max of safe search and label score
+      const maxSafeSearchScore = Math.max(adultScore, violenceScore, sexualScore, medicalScore);
+      imageScore = Math.max(maxSafeSearchScore, labelMaxScore);
 
       // If any reason found, mark image as unsafe
       if (imageReason) {
@@ -630,8 +499,29 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     if (isTextToxic) reasons.push(`Văn bản: ${textReason}`);
     if (isImageUnsafe) reasons.push(`Hình ảnh: ${imageReason}`);
     // join text + image reasons
-    finalReason = reasons.join(" | ");
+    finalReason = reasons.join("\n");
     console.log(` [BLOCK] Bài ${postId}, lý do: ${finalReason}`);
+
+    // Log violation to violation_logs collection
+    await logViolation({
+      uid: postData.uid,
+      targetId: postId,
+      targetType: "post",
+      parentId: null,
+      actionType: "create",
+
+      moderatedBy: "AI",
+      violationLabels: violationLabels,
+
+      aiConfidence: Math.max(textScore, imageScore),
+      textScore: textScore,
+      imageScore: imageScore,
+
+      reason: finalReason,
+      toxicText: text || null,
+      toxicImageUrl: image || null,
+
+    });
 
     if (isReshare && postData.originalPostId) {
       try {
@@ -707,11 +597,13 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
   // Variables for storing test results
   let isTextToxic = false;
   let textReason = null;
+  let textScore=0.0;
 
   let isImageUnsafe = false;
   let imageReason = null;
+  let imageScore=0.0;
 
-  //
+  const violationLabels = [];
   let checkError=null;
 
   // Check Text if changed
@@ -728,6 +620,8 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
       if (aiResult.is_toxic === true) {
         isTextToxic = true;
         textReason = aiResult.reason || "Văn bản vi phạm tiêu chuẩn";
+        textScore = 0.97; // Fixed score for now
+        violationLabels.push("toxic_text");
       }
     } catch (error) {
       checkError=`Lỗi Server AI Text: ${error.message}`;
@@ -755,22 +649,34 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
 
       console.log(`Vision SafeSearch:`, JSON.stringify(safeSearch));
 
-      // Check likelihoods
-      const isViolenceUnsafe = (likelihood) => {
-        return likelihood === "POSSIBLE" || likelihood === "LIKELY"|| likelihood === "VERY_LIKELY";
-      };
+      // Calculate scores from SafeSearch
+      const adultScore = getVisionScore(safeSearch.adult);
+      const violenceScore = getVisionScore(safeSearch.violence);
+      const sexualScore = getVisionScore(safeSearch.racy);
+      const medicalScore = getVisionScore(safeSearch.medical);
 
-      const isAdultUnsafe = (likelihood) => {
-        return likelihood === "LIKELY" || likelihood === "VERY_LIKELY";
-      };
+      // thresholds blocking
+      const THRESHOLD_LIKELY = 0.75;
+      const THRESHOLD_POSSIBLE = 0.50;
 
-      if (isAdultUnsafe(safeSearch.adult)) imageReason = "Chứa nội dung người lớn (18+)";
-      else if (isViolenceUnsafe(safeSearch.violence)) imageReason = "Chứa nội dung bạo lực";
-      else if (isAdultUnsafe(safeSearch.racy)) imageReason = "Hình ảnh quá gợi cảm";
-      else if (isViolenceUnsafe(safeSearch.medical)) imageReason = "Hình ảnh máu me/y tế";
+      //
+      if (adultScore >= THRESHOLD_LIKELY) {
+        imageReason = "Chứa nội dung người lớn (18+)";
+        violationLabels.push("adult");
+      } else if (violenceScore >= THRESHOLD_POSSIBLE) {
+        imageReason = "Chứa nội dung bạo lực";
+        violationLabels.push("violence");
+      } else if (sexualScore >= THRESHOLD_LIKELY) {
+        imageReason = "Hình ảnh quá gợi cảm";
+        violationLabels.push("racy/sexual");
+      } else if (medicalScore >= THRESHOLD_POSSIBLE) {
+        imageReason = "Hình ảnh máu me/y tế";
+        violationLabels.push("medical_gore");
+      }
 
-      // Check keywords if class 1 didn't catch anything
-      if (!imageReason && labels) {
+      // Check keywords (Labels)
+      let labelMaxScore = 0.0;
+      if (labels) {
         const BLACKLIST_LABELS = [
           "blood", "bleeding", "injury", "wound",
           "explosion", "bomb", "grenade",
@@ -783,12 +689,27 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
           const labelName = label.description.toLowerCase();
           const score = label.score;
 
-          if (BLACKLIST_LABELS.some((badWord) => labelName.includes(badWord)) && score > 0.7) {
-            imageReason = `Phát hiện vật thể/nội dung cấm: ${label.description} (${Math.round(score*100)}%)`;
-            break;
+          // Find if label matches any bad word
+          const matchedBadWords= BLACKLIST_LABELS.find((badWord) => labelName.includes(badWord));
+
+          if (matchedBadWords && score > 0.7) {
+            if (!imageReason) { // Only set if not already set
+              const translatedLabel = VIETNAMESE_LABELS[matchedBadWords] || label.description;
+              imageReason = `Phát hiện vật thể/nội dung cấm: ${translatedLabel}`;
+            }
+            // Log the violation label
+            violationLabels.push(`banned_object:${label.description}`);
+            // Update max label score
+            if (score > labelMaxScore) {
+              labelMaxScore = score;
+            }
           }
         }
       }
+
+      // Calculate Image Final
+      const maxSafeSearchScore = Math.max(adultScore, violenceScore, sexualScore, medicalScore);
+      imageScore = Math.max(maxSafeSearchScore, labelMaxScore);
 
       if (imageReason) {
         isImageUnsafe = true;
@@ -809,7 +730,7 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
 
   const isRejected = isTextToxic || isImageUnsafe;
 
-  // IF REJECTED -> ROLLBACK TO OLD CONTENT
+  // IF REJECTED -> BLOCK & ROLLBACK TO OLD CONTENT
   if (isRejected) {
     // Summary of reasons for displaying
     const reasons = [];
@@ -817,9 +738,29 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
     if (isTextToxic) reasons.push(`Văn bản: ${textReason}`);
     if (isImageUnsafe) reasons.push(`Hình ảnh: ${imageReason}`);
     const finalReason = reasons.join("\n");
+    const finalConfidence = Math.max(textScore, imageScore);
 
     console.log(` [BLOCK] UPDATE Bài ${postId} sau cập nhật, lý do: ${finalReason}`);
     console.log(`Đang Rollback về nội dung an toàn trước đó...`);
+
+    // Log violations to violation_logs collection
+    await logViolation({
+      uid: afterData.uid,
+      targetId: postId,
+      targetType: "post",
+      parentId: null,
+      actionType: "update",
+
+      moderatedBy: "AI_Rollback",
+      violationLabels: violationLabels,
+      aiConfidence: finalConfidence,
+      textScore: textScore,
+      imageScore: imageScore,
+
+      reason: finalReason,
+      toxicText: isTextChanged ? newText : null,
+      toxicImageUrl: isImageChanged ? newImage : null,
+    });
 
     try {
       // Rollback to old content
@@ -936,5 +877,52 @@ async function deleteImageFromStorage(imageUrl) {
   } catch (error) {
     // Nếu ảnh không tồn tại hoặc lỗi, chỉ log ra chứ không làm crash app
     console.warn(`[CLEANUP WARNING] Không thể xóa ảnh cũ: ${error.message}`);
+  }
+}
+
+
+// Log Violation Utility Function
+async function logViolation(data) {
+  try {
+    const violationRef = admin.firestore().collection("violation_logs").doc();
+    await violationRef.set({
+      logId: violationRef.id,
+      uid: data.uid,
+
+      targetId: data.targetId, // could be postId, commentId, or userId
+      targetType: data.targetType, // "post", "comment", "user"
+      parentId: data.parentId || null, // for comments, the postId it belongs to
+
+      actionType: data.actionType, // 'create' 'update','reshare', 'delete'
+
+      moderatedBy: data.moderatedBy || "AI", // AI, Admin, System
+      violationLabels: data.violationLabels || [], // array of labels detected
+
+      aiConfidence: data.aiConfidence || 0.0, // confidence score from AI
+
+      reason: data.reason, // reason for violation
+      textScore: data.textScore || 0.0, // text toxicity score
+      imageScore: data.imageScore || 0.0, // image safety score
+
+      toxicText: data.toxicText || null,
+      toxicImageUrl: data.toxicImageUrl || null,
+
+      createdAt: admin.firestore.Timestamp.now(),
+      isRead: false,
+    });
+    console.log(`[AUDIT] Đã ghi log ${data.targetType} cho User ${data.uid}`);
+  } catch (error) {
+    console.error(`[AUDIT ERROR] Không thể ghi log: ${error.message}`);
+  }
+}
+
+function getVisionScore(likelihood) {
+  switch (likelihood) {
+    case "VERY_LIKELY": return 0.95; // Most likely a violation
+    case "LIKELY": return 0.75; // Likely a violation
+    case "POSSIBLE": return 0.50; // Possible violation
+    case "UNLIKELY": return 0.25; // Unlikely violation
+    case "VERY_UNLIKELY": return 0.05; // Very unlikely violation
+    default: return 0.0; // No violation
   }
 }
