@@ -508,7 +508,7 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       targetId: postId,
       targetType: "post",
       parentId: null,
-      actionType: "create",
+      actionType: isReshare ? "reshare" : "create",
 
       moderatedBy: "AI",
       violationLabels: violationLabels,
