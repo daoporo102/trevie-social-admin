@@ -357,12 +357,14 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       // get AI result
       const aiResult = response.data;
 
+      console.log(`[AI RESULT] Toxic: ${aiResult.is_toxic}, Score: ${aiResult.confidence_score}`);
+
       // process AI result
       // if toxic
       if (aiResult.is_toxic === true) {
         isTextToxic = true;
         textReason = aiResult.reason || "Vi phạm tiêu chuẩn văn bản";
-        textScore = 0.97; // Fixed score for now
+        textScore = aiResult.confidence_score || 0.97; // Fixed score for now
         violationLabels.push("toxic_text");
       }
     } catch (error) {
@@ -616,11 +618,13 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
       const response = await axios.post(AI_SERVER_URL, {text: newText}, {timeout: 10000});
       const aiResult = response.data;
 
+      console.log(`[AI RESULT] Toxic: ${aiResult.is_toxic}, Score: ${aiResult.confidence_score}`);
+
       // Check if toxic
       if (aiResult.is_toxic === true) {
         isTextToxic = true;
         textReason = aiResult.reason || "Văn bản vi phạm tiêu chuẩn";
-        textScore = 0.97; // Fixed score for now
+        textScore = aiResult.confidence_score || 0.97; // Fixed score for now
         violationLabels.push("toxic_text");
       }
     } catch (error) {
