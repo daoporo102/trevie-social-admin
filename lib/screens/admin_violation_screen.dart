@@ -207,7 +207,7 @@ class _AdminViolationScreenState extends State<AdminViolationScreen> {
   Color _getSeverityColor(double confidence) {
     if (confidence >= 0.9) return errorBackgroundColor;
     if (confidence >= 0.75) return Colors.orange;
-    return infoBackgroundColor;
+    return errorBackgroundColor;
   }
 
   void _showViolationDetails(BuildContext context, ViolationLog log) {

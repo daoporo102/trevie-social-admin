@@ -14,9 +14,7 @@ class SemiCircleScoreWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = score > 0.8
-        ? errorBackgroundColor
-        : (score > 0.5 ? Colors.orange : appPrimaryColor);
+    final Color color = score > 0.8 ? errorBackgroundColor : Colors.orange;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center, // Center vertically
