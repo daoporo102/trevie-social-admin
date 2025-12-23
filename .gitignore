@@ -166,3 +166,5 @@ app.*.symbols
 
 firebase.json
 .firebaserc
+
+.firebase/
