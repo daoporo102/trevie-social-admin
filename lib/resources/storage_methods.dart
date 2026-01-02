@@ -7,6 +7,30 @@ import 'package:uuid/uuid.dart';
 class StorageMethods {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Helper to detect image type
+  String _detectImageType(Uint8List bytes) {
+    // PNG signature: 89 50 4E 47
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+
+    // JPEG signature: FF D8 FF
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF) {
+      return 'image/jpeg';
+    }
+
+    // Default to JPEG
+    return 'image/jpeg';
+  }
+
   //adding image to firebase storage
   Future<String> uploadImageToStorage(
     String childName,
@@ -24,7 +48,14 @@ class StorageMethods {
         ref = ref.child(id);
       }
 
-      UploadTask uploadTask = ref.putData(file);
+      // Detect & set exactly content type
+      final contentType = _detectImageType(file);
+      final metadata = SettableMetadata(
+        contentType: contentType,
+        customMetadata: {'uploaded-by': 'flutter-admin'},
+      );
+
+      UploadTask uploadTask = ref.putData(file, metadata);
 
       TaskSnapshot snap = await uploadTask;
       String downloadUrl = await snap.ref.getDownloadURL();
