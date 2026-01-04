@@ -1,7 +1,7 @@
 /*
  * Region: asia-southeast1 (Singapore)
  * to run:
- *    step 1: npm run lint -- --fix
+ *    step 1: imageResults = await Promise.all(imageCheckPromises);
  *    step 2: firebase deploy --only functions
  *    see log: firebase functions:log
  */
@@ -319,15 +319,16 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   // check the post is reshare or original
   const isReshare = postData.originalPostId ? true : false;
   // if the post is a reshare, skip checking image
-  const image = isReshare ? "" : (postData.postUrl || "");
+  const imageUrls = isReshare ? [] : (postData.postUrls || []);
 
   // if don't have both text + image -> Active
-  if (!text && !image) {
+  if (!text && imageUrls.length===0) {
     console.log(`Bài ${postId} không có văn bản và hình ảnh. Bỏ qua kiểm duyệt AI.`);
     return snapshot.ref.update({status: "active"});
   }
 
   console.log(`[START] Bắt đầu kiểm duyệt bài ${postId}...`);
+  console.log(`[INFO] Số lượng ảnh: ${imageUrls.length}`);
   const startTime = Date.now();
 
   // Variables for storing test results
@@ -341,6 +342,9 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
 
   // Violation Labels
   const violationLabels = [];
+
+  // Prepare image results array
+  let imageResults = [];
 
   // RUN BOTH CHECKS SIMULTANEOUSLY (Promise.all)
   // Text & Image are Checked in Parallel
@@ -374,118 +378,147 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
   };
 
   // Check Image
-  const checkImagePromise = async ()=>{
+  const checkAllImagesPromise = async ()=>{
     // image == null => skip
-    if (!image) return;
+    if (imageUrls.length === 0) return;
 
-    try {
-      console.log(`Checking Image...`);
-      // Use Google Vision to check image safety
-      const [result] = await visionClient.annotateImage({
-        image: {source: {imageUri: image}},
-        features: [
-          {type: "SAFE_SEARCH_DETECTION"},
-          {type: "LABEL_DETECTION", maxResults: 10}, // get 10 labels
-        ],
-      });
+    // create promise for each image
+    const imageCheckPromises = imageUrls.map(async (imageUrl, index) => {
+      try {
+        console.log(`[${index + 1}/${imageUrls.length}] Checking image: ${imageUrl}`);
+        // Use Google Vision to check image safety
+        const [result] = await visionClient.annotateImage({
+          image: {source: {imageUri: imageUrl}},
+          features: [
+            {type: "SAFE_SEARCH_DETECTION"},
+            {type: "LABEL_DETECTION", maxResults: 10}, // get 10 labels
+          ],
+        });
 
-      const safeSearch = result.safeSearchAnnotation;
-      const labels = result.labelAnnotations;
+        const safeSearch = result.safeSearchAnnotation;
+        const labels = result.labelAnnotations;
 
-      const labelDescriptions = labels.map((l) => l.description).join(", ");
-      console.log(`Vision Labels: [${labelDescriptions}]`);
-      console.log(`Vision SafeSearch:`, JSON.stringify(safeSearch));
+        const labelDescriptions = labels.map((l) => l.description).join(", ");
+        console.log(`Vision Labels: [${labelDescriptions}]`);
+        console.log(`Vision SafeSearch:`, JSON.stringify(safeSearch));
 
-      // Check the likelihood of unsafe content
-      // LIKELY: khả năng cao
-      // VERY_LIKELY: rất chắc chắn
-      // POSSIBLE: có thể/ nghi ngờ
-      // UNLIKELY: không có khả năng
-      // VERY_UNLIKELY: rất không có khả năng
-      // UNKNOWN: không xác định
+        // Check the likelihood of unsafe content
+        // LIKELY: khả năng cao
+        // VERY_LIKELY: rất chắc chắn
+        // POSSIBLE: có thể/ nghi ngờ
+        // UNLIKELY: không có khả năng
+        // VERY_UNLIKELY: rất không có khả năng
+        // UNKNOWN: không xác định
 
-      // CLASS 1: SCORING SAFE SEARCH
-      const adultScore = getVisionScore(safeSearch.adult);
-      const violenceScore = getVisionScore(safeSearch.violence);
-      const sexualScore = getVisionScore(safeSearch.racy);
-      const medicalScore = getVisionScore(safeSearch.medical);
+        // CLASS 1: SCORING SAFE SEARCH
+        const adultScore = getVisionScore(safeSearch.adult);
+        const violenceScore = getVisionScore(safeSearch.violence);
+        const sexualScore = getVisionScore(safeSearch.racy);
+        const medicalScore = getVisionScore(safeSearch.medical);
 
-      // Blocking threshold
-      const THRESHOLD_LIKELY = 0.75;
-      const THRESHOLD_POSSIBLE = 0.50;
+        // Blocking threshold
+        const THRESHOLD_LIKELY = 0.75;
+        const THRESHOLD_POSSIBLE = 0.50;
 
-      // Determine if image is unsafe based on scores & push violation labels
-      if (adultScore >= THRESHOLD_LIKELY) {
-        imageReason = "Chứa nội dung người lớn (18+)";
-        violationLabels.push("adult");
-      } else if (violenceScore >= THRESHOLD_POSSIBLE) {
-        imageReason = "Chứa nội dung bạo lực";
-        violationLabels.push("violence");
-      } else if (sexualScore >= THRESHOLD_LIKELY) {
-        imageReason = "Hình ảnh quá gợi cảm";
-        violationLabels.push("sexual/racy");
-      } else if (medicalScore >= THRESHOLD_POSSIBLE) {
-        imageReason = "Hình ảnh máu me/y tế";
-        violationLabels.push("medical/blood");
-      }
+        let localImageReason = null;
 
-      // CLASS 2: CHECK KEYWORDS (LABEL)
-      // If class 1 hasn't caught it yet, use class 2 to scan for forbidden keywords.
+        // Determine if image is unsafe based on scores & push violation labels
+        if (adultScore >= THRESHOLD_LIKELY) {
+          localImageReason = "Chứa nội dung người lớn (18+)";
+          violationLabels.push(`adult:image_${index + 1}`);
+        } else if (violenceScore >= THRESHOLD_POSSIBLE) {
+          localImageReason = "Chứa nội dung bạo lực";
+          violationLabels.push(`violence:image_${index + 1}`);
+        } else if (sexualScore >= THRESHOLD_LIKELY) {
+          localImageReason = "Hình ảnh quá gợi cảm";
+          violationLabels.push(`sexual:image_${index + 1}`);
+        } else if (medicalScore >= THRESHOLD_POSSIBLE) {
+          localImageReason = "Hình ảnh máu me/y tế";
+          violationLabels.push(`medical:image_${index + 1}`);
+        }
 
-      // Calculate label score
-      let labelMaxScore = 0.0;
-      if (labels) {
+        // CLASS 2: CHECK KEYWORDS (LABEL)
+        // If class 1 hasn't caught it yet, use class 2 to scan for forbidden keywords.
+
+        // Calculate label score
+        let labelMaxScore = 0.0;
+        if (labels) {
         // Define forbidden keywords
-        const BLACKLIST_LABELS = [
-          "blood", "bleeding", "injury", "wound", // Blood, injury
-          "explosion", "bomb", "grenade", // Violence explosion
-          "gun", "firearm", "pistol", "rifle", "weapon", "sword", "knife", // Weapons
-          "fight", "fighting", "assault", "violence", // Fighting
-          "horror", "terror", // Horror
-        ];
+          const BLACKLIST_LABELS = [
+            "blood", "bleeding", "injury", "wound", // Blood, injury
+            "explosion", "bomb", "grenade", // Violence explosion
+            "gun", "firearm", "pistol", "rifle", "weapon", "sword", "knife", // Weapons
+            "fight", "fighting", "assault", "violence", // Fighting
+            "horror", "terror", // Horror
+          ];
 
-        // Check if any label is in the blacklist
-        for (const label of labels) {
-          const labelName = label.description.toLowerCase();
-          const score = label.score; // Accuracy (0.0 - 1.0)
+          // Check if any label is in the blacklist
+          for (const label of labels) {
+            const labelName = label.description.toLowerCase();
+            const score = label.score; // Accuracy (0.0 - 1.0)
 
-          // Find if label matches any bad word
-          const matchedBadWords= BLACKLIST_LABELS.find((badWord) => labelName.includes(badWord));
+            // Find if label matches any bad word
+            const matchedBadWords= BLACKLIST_LABELS.find((badWord) => labelName.includes(badWord));
 
-          // Check if label is in the blacklist
-          if (matchedBadWords && score > 0.7) {
+            // Check if label is in the blacklist
+            if (matchedBadWords && score > 0.7) {
             // If found, set reason and score
-            if (!imageReason) {
-              const translatedLabel = VIETNAMESE_LABELS[matchedBadWords] || label.description;
-              imageReason = `Phát hiện vật thể/nội dung cấm: ${translatedLabel}`;
-            }
+              if (!localImageReason) {
+                const translatedLabel = VIETNAMESE_LABELS[matchedBadWords] || label.description;
+                localImageReason = `Phát hiện vật thể/nội dung cấm: ${translatedLabel}`;
+              }
 
-            // Always push the log so the admin knows there are guns/knives... even if blocked for other reasons.
-            violationLabels.push(`banned_object:${label.description}`);
+              // Always push the log so the admin knows there are guns/knives... even if blocked for other reasons.
+              violationLabels.push(`banned_object:${label.description}:image_${index + 1}`);
 
-            // Update max label score
-            if (score > labelMaxScore) {
-              labelMaxScore = score;
+              // Update max label score
+              if (score > labelMaxScore) {
+                labelMaxScore = score;
+              }
             }
           }
         }
-      }
 
-      // Final image score is the max of safe search and label score
-      const maxSafeSearchScore = Math.max(adultScore, violenceScore, sexualScore, medicalScore);
-      imageScore = Math.max(maxSafeSearchScore, labelMaxScore);
+        // Final image score is the max of safe search and label score
+        const maxSafeSearchScore = Math.max(adultScore, violenceScore, sexualScore, medicalScore);
+        const currentImageScore = Math.max(maxSafeSearchScore, labelMaxScore);
 
-      // If any reason found, mark image as unsafe
-      if (imageReason) {
-        isImageUnsafe = true;
-      }
-    } catch (error) {
+        return {
+          isUnsafe: !!localImageReason,
+          reason: localImageReason,
+          score: currentImageScore,
+          imageUrl: imageUrl,
+          index: index + 1,
+        };
+      } catch (error) {
       // If Vision API error, log the error
-      console.error(`[ERROR] Lỗi Google Vision: ${error.message}`);
+        console.error(`[ERROR] Lỗi khi check ảnh ${index + 1}: ${error.message}`);
+        return {isUnsafe: false, reason: null, score: 0.0};
+      }
+    });
+
+    // Run all image checks in parallel
+    imageResults = await Promise.all(imageCheckPromises);
+
+    // Collect all results
+    const unsafeImages = imageResults.filter((r) => r.isUnsafe);
+
+    if (unsafeImages.length > 0) {
+      isImageUnsafe = true;
+
+      // get highest score
+      imageScore = Math.max(...imageResults.map((r) => r.score));
+
+      // Collect all reasons
+      const reasonList = unsafeImages.map((img) => `Ảnh ${img.index}: ${img.reason}`);
+      imageReason = reasonList.join("\n");
+
+      console.log(`[BLOCK] Phát hiện ${unsafeImages.length}/${imageUrls.length} ảnh vi phạm`);
     }
   };
-    // Run both checks in parallel
-  await Promise.all([checkTextPromise(), checkImagePromise()]);
+
+  // Run both checks in parallel
+  await Promise.all([checkTextPromise(), checkAllImagesPromise()]);
 
   // After both checks are done, decide the final status
   const endTime = Date.now();
@@ -504,6 +537,16 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
     finalReason = reasons.join("\n");
     console.log(` [BLOCK] Bài ${postId}, lý do: ${finalReason}`);
 
+    // Prepare toxic images array
+    const toxicImagesArray = imageResults
+        .filter((img) => img.isUnsafe)
+        .map((img) => ({
+          url: img.imageUrl,
+          index: img.index,
+          reason: img.reason,
+          score: img.score,
+        }));
+
     // Log violation to violation_logs collection
     await logViolation({
       uid: postData.uid,
@@ -521,8 +564,8 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
 
       reason: finalReason,
       toxicText: text || null,
-      toxicImageUrl: image || null,
-
+      toxicImageUrl: imageUrls.join(", ") || null, // join all image URLs
+      toxicImages: toxicImagesArray,
     });
 
     if (isReshare && postData.originalPostId) {
@@ -550,7 +593,7 @@ exports.checkPostContent = onDocumentCreated("posts/{postId}", async (event) => 
       aiReasonImage: imageReason,
       moderatedBy: "AI",
       moderatedAt: admin.firestore.Timestamp.now(),
-      imageChecked: !!image, // mark if image was checked
+      imageChecked: imageUrls.length > 0, // mark if image was checked
       textChecked: !!text, // mark if text was checked
     });
     console.log(`[DONE] Hoàn tất sau ${executionTime}ms`);
@@ -909,7 +952,8 @@ async function logViolation(data) {
       imageScore: data.imageScore || 0.0, // image safety score
 
       toxicText: data.toxicText || null,
-      toxicImageUrl: data.toxicImageUrl || null,
+      toxicImageUrl: data.toxicImageUrl || null, // single toxic image URL
+      toxicImages: data.toxicImages || [], // array of toxic image URLs
 
       createdAt: admin.firestore.Timestamp.now(),
       isRead: false,
