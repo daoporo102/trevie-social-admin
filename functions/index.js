@@ -619,9 +619,12 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
   const newText = afterData.postText || "";
   const oldText = beforeData.postText || "";
 
+  // Check if post is a reshare
+  const isReshare = afterData.originalPostId ? true : false;
+
   // Multiple images (postUrls array)
-  const newImageUrls = afterData.postUrls || [];
-  const oldImageUrls = beforeData.postUrls || [];
+  const newImageUrls = isReshare ? [] : (afterData.postUrls || []);
+  const oldImageUrls = isReshare ? [] : (beforeData.postUrls || []);
 
   const isTextChanged = newText !== oldText;
   const isImageChanged = JSON.stringify(newImageUrls) !== JSON.stringify(oldImageUrls);
@@ -630,6 +633,11 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
   if (!isTextChanged && !isImageChanged) {
     console.log(`Bài ${postId} cập nhật nhưng không thay đổi nội dung văn bản hoặc hình ảnh. Bỏ qua kiểm tra AI.`);
     return;
+  }
+
+  // Check if post is a reshare -> display log
+  if (isReshare) {
+    console.log(`[UPDATE] Reshare post ${postId} - chỉ kiểm tra văn bản`);
   }
 
   if (afterData.moderatedBy === "AI_Rollback") {
