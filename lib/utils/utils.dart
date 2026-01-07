@@ -41,7 +41,7 @@ String formatTimestamp(Timestamp timestamp) {
   }
 }
 
-// ✅ NEW: Pick multiple images
+// Pick multiple images
 Future<List<Uint8List>?> pickMultipleImages() async {
   final ImagePicker imagePicker = ImagePicker();
   final List<XFile> files = await imagePicker.pickMultiImage();
@@ -71,7 +71,7 @@ Future<List<Uint8List>?> pickMultipleImages() async {
   return images;
 }
 
-// ✅ NEW: Compress single image
+// Compress single image
 Future<Uint8List?> compressImage(Uint8List imageBytes) async {
   try {
     // Validate size before compress
@@ -115,7 +115,7 @@ Future<Uint8List?> compressImage(Uint8List imageBytes) async {
   }
 }
 
-// ✅ NEW: Compress multiple images
+// Compress multiple images
 Future<List<Uint8List>> compressImages(List<Uint8List> images) async {
   List<Uint8List> compressed = [];
   for (var image in images) {
@@ -127,7 +127,7 @@ Future<List<Uint8List>> compressImages(List<Uint8List> images) async {
   return compressed;
 }
 
-// ✅ UPDATED: Auto-compress when picking single image
+// Auto-compress when picking single image
 Future<Uint8List?> pickImage(ImageSource source) async {
   final ImagePicker imagePicker = ImagePicker();
   final XFile? file = await imagePicker.pickImage(source: source);
