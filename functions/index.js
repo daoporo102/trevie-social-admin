@@ -8,7 +8,7 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {setGlobalOptions} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentDeleted} = require("firebase-functions/v2/firestore");
 const axios = require("axios");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const vision = require("@google-cloud/vision");
@@ -964,6 +964,196 @@ exports.checkPostContentUpdate = onDocumentUpdated("posts/{postId}", async (even
       console.error(`[ERROR] Lỗi cập nhật trạng thái đã duyệt cho bài ${postId}: ${error.message}`);
     }
   }
+});
+
+/**
+ * Trigger when comment is created
+ */
+exports.onCommentCreated = onDocumentCreated(
+    "posts/{postId}/comments/{commentId}",
+    async (event) => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalComments: admin.firestore.FieldValue.increment(1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+
+      console.log("Comment counter incremented");
+    },
+);
+/**
+ * Trigger when comment is deleted
+ */
+exports.onCommentDeleted = onDocumentDeleted(
+    "posts/{postId}/comments/{commentId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalComments: admin.firestore.FieldValue.increment(-1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when post is created
+ */
+exports.onPostCreated = onDocumentCreated(
+    "posts/{postId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalPosts: admin.firestore.FieldValue.increment(1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when post is deleted
+ */
+exports.onPostDeleted = onDocumentDeleted(
+    "posts/{postId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalPosts: admin.firestore.FieldValue.increment(-1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when user is created
+ */
+exports.onUserCreated = onDocumentCreated(
+    "users/{userId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalUsers: admin.firestore.FieldValue.increment(1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when user is deleted
+ */
+exports.onUserDeleted = onDocumentDeleted(
+    "users/{userId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalUsers: admin.firestore.FieldValue.increment(-1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when violation is created
+ */
+exports.onViolationCreated = onDocumentCreated(
+    "violations/{violationId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalViolations: admin.firestore.FieldValue.increment(1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+/**
+ * Trigger when violation is deleted
+ */
+exports.onViolationDeleted = onDocumentDeleted(
+    "violations/{violationId}",
+    async () => {
+      const counterRef = admin.firestore().collection("_counters").doc("stats");
+
+      await counterRef.set(
+          {
+            totalViolations: admin.firestore.FieldValue.increment(-1),
+            lastUpdated: admin.firestore.Timestamp.now(),
+          },
+          {merge: true},
+      );
+    },
+);
+
+/**
+ * Initialize counters
+ */
+exports.initializeCounters = onCall(async (request) => {
+  if (!request.auth || !request.auth.token.admin) {
+    throw new HttpsError(
+        "permission-denied",
+        "Chỉ admin mới có thể khởi tạo counters",
+    );
+  }
+
+  console.log("[INIT] Bắt đầu khởi tạo counters...");
+
+  const [usersSnap, postsSnap, violationsSnap] = await Promise.all([
+    admin.firestore().collection("users").get(),
+    admin.firestore().collection("posts").get(),
+    admin.firestore().collection("violation_logs").get(),
+  ]);
+
+  // Count all comments
+  let totalComments = 0;
+  for (const postDoc of postsSnap.docs) {
+    const commentsSnap = await postDoc.ref.collection("comments").get();
+    totalComments += commentsSnap.size;
+  }
+
+  // Write counters
+  await admin.firestore().collection("_counters").doc("stats").set({
+    totalUsers: usersSnap.size,
+    totalPosts: postsSnap.size,
+    totalComments: totalComments,
+    totalViolations: violationsSnap.size,
+    lastUpdated: admin.firestore.Timestamp.now(),
+    initializedAt: admin.firestore.Timestamp.now(),
+  });
+
+  console.log(`[INIT] Hoàn tất: Users=${usersSnap.size},
+     Posts=${postsSnap.size}, Comments=${totalComments},
+      Violations=${violationsSnap.size}`);
+
+  return {
+    success: true,
+    counters: {
+      users: usersSnap.size,
+      posts: postsSnap.size,
+      comments: totalComments,
+      violations: violationsSnap.size,
+    },
+  };
 });
 
 // Utility function to delete image from Firebase Storage
