@@ -478,10 +478,10 @@ class _CommentsListScreenState extends State<CommentsListScreen> {
         columns: const [
           DataColumn2(
             label: Text(
-              'Tác giả',
+              'Người đăng',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            size: ColumnSize.M,
+            size: ColumnSize.L,
           ),
           DataColumn2(
             label: Text(
@@ -552,17 +552,48 @@ class _CommentsListScreenState extends State<CommentsListScreen> {
 
   DataRow2 _buildDataRow(Map<String, dynamic> item) {
     final Comment comment = item['comment'];
-    final String postId = item['postId'];
-    final String postText = item['postText'];
-    final String postAuthor = item['postAuthor'];
+    final String postId = item['postId'] ?? '';
+    final String postText = item['postText'] ?? '';
+    final String postAuthor = item['postAuthor'] ?? 'Unknown';
+    // Handle null values with null-aware operators
+    final String name = (item['name'] as String?) ?? comment.name;
+    final String profilePic =
+        (item['profilePic'] as String?) ?? comment.profilePic;
 
     return DataRow2(
       cells: [
-        // Author Name
+        // User Info
         DataCell(
-          Text(
-            comment.name,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: appPrimaryColor.withValues(alpha: 0.2),
+                backgroundImage: profilePic.isNotEmpty
+                    ? NetworkImage(profilePic)
+                    : null,
+                radius: 20,
+                child: profilePic.isEmpty
+                    ? Icon(Icons.person, color: appPrimaryColor)
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
 
