@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:social_media_admin/utils/colors.dart';
 
-enum SnackBarType { success, info, error }
+enum SnackBarType { success, info, warning, error }
 
 class CustomSnackBar {
   static SnackBar buildSnackBar({
@@ -21,6 +21,10 @@ class CustomSnackBar {
         backgroundColor = infoBackgroundColor;
         icon = Icons.info;
         break;
+      case SnackBarType.warning:
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        break;
       case SnackBarType.error:
         backgroundColor = errorBackgroundColor;
         icon = Icons.error;
@@ -35,9 +39,7 @@ class CustomSnackBar {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                color: onPrimaryColor
-              ),
+              style: TextStyle(color: onPrimaryColor),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

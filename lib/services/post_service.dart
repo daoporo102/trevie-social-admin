@@ -161,20 +161,29 @@ class PostService {
   // Create a new post (for admins)
   Future<String> createPost({
     required String postText,
-    required Uint8List image,
+    required List<Uint8List> images,
     required String uid,
     required String displayName,
     required String profImage,
   }) async {
     try {
-      // Upload image to storage
-      final photoUrl = await StorageMethods().uploadImageToStorage(
+      // Validate
+      if (images.isEmpty) {
+        return 'Vui lòng chọn ít nhất một ảnh';
+      }
+
+      if (images.length > 10) {
+        return 'Chỉ được tải lên tối đa 10 ảnh';
+      }
+
+      // Upload multiple images to storage
+      final photoUrls = await StorageMethods().uploadMultipleImages(
         'posts',
-        image,
+        images,
         true,
       );
 
-      if (photoUrl.isEmpty) {
+      if (photoUrls.isEmpty) {
         return 'Lỗi tải ảnh lên, vui lòng thử lại';
       }
 
@@ -188,7 +197,7 @@ class PostService {
         uid: uid,
         postText: postText,
         displayName: displayName,
-        postUrl: photoUrl,
+        postUrls: photoUrls,
         profImage: profImage,
         datePublished: now,
         likes: [],

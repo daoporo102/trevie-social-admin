@@ -1,13 +1,14 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:social_media_admin/services/post_service.dart';
 import 'package:social_media_admin/utils/colors.dart';
 import 'package:social_media_admin/utils/global_variables.dart';
 import 'package:social_media_admin/utils/utils.dart';
+import 'package:social_media_admin/widgets/custom_button.dart';
 import 'package:social_media_admin/widgets/custom_snack_bar.dart';
 import 'package:social_media_admin/widgets/text_field_input.dart';
 
@@ -22,8 +23,9 @@ class CreatePostDialog extends StatefulWidget {
 class _CreatePostDialogState extends State<CreatePostDialog> {
   final TextEditingController _postTextController = TextEditingController();
   final PostService _postService = PostService();
-  Uint8List? _image;
+  List<Uint8List> _images = [];
   bool _isCreatingPost = false;
+  static const int maxImages = 10;
 
   @override
   void dispose() {
@@ -31,13 +33,96 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
     super.dispose();
   }
 
-  Future<void> _selectImage() async {
-    final image = await pickImage(ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _image = image;
-      });
-    }
+  Future<void> _selectImages() async {
+    return showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return SimpleDialog(
+          backgroundColor: webBackgroundColor,
+          title: const Text('Chọn ảnh cho bài đăng'),
+          children: [
+            SimpleDialogOption(
+              padding: const EdgeInsets.all(20),
+              child: const Text('Chọn ảnh từ thư viện'),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+
+                // Check limit
+                if (_images.length >= maxImages) {
+                  if (!mounted) return;
+                  displaySnackBar(
+                    'Bạn đã đạt giới hạn $maxImages ảnh',
+                    context,
+                    SnackBarType.error,
+                  );
+                  return;
+                }
+
+                try {
+                  List<Uint8List>? files = await pickMultipleImages();
+                  if (!mounted) return;
+
+                  if (files == null || files.isEmpty) {
+                    displaySnackBar(
+                      'Không có ảnh nào được chọn',
+                      context,
+                      SnackBarType.error,
+                    );
+                    return;
+                  }
+
+                  // Calculate remaining slots
+                  int remainingSlots = maxImages - _images.length;
+
+                  if (files.length > remainingSlots) {
+                    displaySnackBar(
+                      'Chỉ có thể thêm $remainingSlots ảnh nữa (tối đa $maxImages ảnh)',
+                      context,
+                      SnackBarType.warning,
+                    );
+                    files = files.sublist(0, remainingSlots);
+                  }
+
+                  setState(() {
+                    _images.addAll(files!);
+                  });
+
+                  displaySnackBar(
+                    'Đã thêm ${files.length} ảnh (${_images.length}/$maxImages)',
+                    context,
+                    SnackBarType.success,
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  displaySnackBar(
+                    'Có lỗi xảy ra khi chọn ảnh',
+                    context,
+                    SnackBarType.error,
+                  );
+                  avoidPrint(e.toString());
+                }
+              },
+            ),
+            SimpleDialogOption(
+              padding: const EdgeInsets.all(20),
+              child: const Text('Hủy'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Remove image at index
+  void _removeImage(int index) {
+    setState(() {
+      if (index >= 0 && index < _images.length) {
+        _images.removeAt(index);
+      }
+    });
   }
 
   Future<void> _createPost() async {
@@ -60,8 +145,12 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
       return;
     }
 
-    if (_image == null) {
-      displaySnackBar('Vui lòng chọn hình ảnh', context, SnackBarType.error);
+    if (_images.isEmpty) {
+      displaySnackBar(
+        'Vui lòng chọn ít nhất một ảnh',
+        context,
+        SnackBarType.error,
+      );
       return;
     }
 
@@ -91,7 +180,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
 
       final result = await _postService.createPost(
         postText: _postTextController.text.trim(),
-        image: _image!,
+        images: _images,
         uid: user.uid,
         displayName: userData['displayName'] ?? 'Admin',
         profImage: userData['photoUrl'] ?? '',
@@ -186,112 +275,169 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
               const SizedBox(height: 20),
 
               // Image Picker Section
-              const Text(
-                'Hình ảnh: *',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: primaryTextColor,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Hình ảnh: * (${_images.length}/$maxImages)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: _images.length >= maxImages
+                          ? errorBackgroundColor
+                          : primaryTextColor,
+                    ),
+                  ),
+                  if (_images.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: _images.length >= maxImages
+                          ? null
+                          : _selectImages,
+                      icon: Icon(
+                        Icons.add_photo_alternate,
+                        size: 16,
+                        color: _images.length >= maxImages
+                            ? secondaryColor
+                            : appPrimaryColor,
+                      ),
+                      label: Text(
+                        _images.length >= maxImages ? 'Đã đủ' : 'Thêm ảnh',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _images.length >= maxImages
+                              ? secondaryColor
+                              : appPrimaryColor,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
 
-              Center(
-                child: Stack(
-                  children: [
-                    GestureDetector(
-                      onTap: _isCreatingPost ? null : _selectImage,
+              // Image Preview or Empty State
+              _images.isEmpty
+                  ? GestureDetector(
+                      onTap: _isCreatingPost ? null : _selectImages,
                       child: Container(
                         height: 200,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: _image != null
-                              ? Colors.transparent
-                              : appPrimaryColor.withValues(alpha: 0.1),
+                          color: appPrimaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: appPrimaryColor.withValues(alpha: 0.3),
                             width: 2,
                           ),
                         ),
-                        child: _image != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.memory(_image!, fit: BoxFit.cover),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_photo_alternate,
-                                    size: 64,
-                                    color: appPrimaryColor,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Nhấn để chọn hình ảnh',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: appPrimaryColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Định dạng: JPG, PNG',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: secondaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-
-                    // Edit button overlay when image is selected
-                    if (_image != null)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          elevation: 4,
-                          child: InkWell(
-                            onTap: _isCreatingPost ? null : _selectImage,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.edit,
-                                    size: 16,
-                                    color: appPrimaryColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Thay đổi',
-                                    style: TextStyle(
-                                      color: appPrimaryColor,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 64,
+                              color: appPrimaryColor,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Nhấn để chọn hình ảnh',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: appPrimaryColor,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tối đa $maxImages ảnh',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: secondaryColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-              ),
+                    )
+                  : SizedBox(
+                      height: 150,
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          dragDevices: {
+                            PointerDeviceKind.touch,
+                            PointerDeviceKind.mouse,
+                          },
+                          scrollbars: true,
+                        ),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _images.length,
+                          itemBuilder: (context, index) {
+                            return Stack(
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 150,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: appPrimaryColor.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(7),
+                                    child: Image.memory(
+                                      _images[index],
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 12,
+                                  child: CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: onPrimaryColor,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: Icon(
+                                        Icons.close,
+                                        size: 16,
+                                        color: secondaryColor,
+                                      ),
+                                      onPressed: () => _removeImage(index),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 4,
+                                  left: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: onPrimaryColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '${index + 1}/${_images.length}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: secondaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
 
               const SizedBox(height: 24),
 
@@ -326,21 +472,18 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
           onPressed: _isCreatingPost ? null : () => Navigator.pop(context),
           child: const Text('Hủy'),
         ),
-        ElevatedButton.icon(
-          onPressed: _isCreatingPost ? null : _createPost,
-          icon: _isCreatingPost
+        CustomButton(
+          onPressed: _isCreatingPost ? () {} : () => _createPost(),
+          child: _isCreatingPost
               ? SizedBox(
                   width: 16,
                   height: 16,
                   child: customCircularProgressIndicator(),
                 )
-              : const Icon(Icons.post_add),
-          label: Text(_isCreatingPost ? 'Đang tạo...' : 'Tạo bài viết'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: appPrimaryColor,
-            foregroundColor: onPrimaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          ),
+              : const Text(
+                  'Tạo bài viết',
+                  style: TextStyle(color: onPrimaryColor),
+                ),
         ),
       ],
     );
