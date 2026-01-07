@@ -6,7 +6,7 @@ class Post {
   final String uid;
   final String postText;
   final String displayName;
-  final String postUrl;
+  final List<String> postUrls;
   final String profImage;
   final DateTime datePublished;
   final List<String> likes;
@@ -38,7 +38,7 @@ class Post {
     required this.postId,
     required this.uid,
     required this.postText,
-    required this.postUrl,
+    required this.postUrls,
     required this.profImage,
     required this.datePublished,
     required this.likes,
@@ -71,7 +71,7 @@ class Post {
     "postId": postId,
     "uid": uid,
     "postText": postText,
-    "postUrl": postUrl,
+    "postUrls": postUrls,
     "profImage": profImage,
     "datePublished": Timestamp.fromDate(datePublished),
     "likes": likes,
@@ -128,11 +128,20 @@ class Post {
       return [];
     }
 
+    // Logic to handle both single and multiple image URLs
+    List<String> images = [];
+    if (snapshot['postUrls'] != null) {
+      images = List<String>.from(snapshot['postUrls']);
+    } else if (snapshot['postUrl'] != null) {
+      // If the old post only has one string image, force it into a list.
+      images.add(snapshot['postUrl']);
+    }
+
     return Post(
       postId: snapshotData['postId'] ?? '',
       uid: snapshotData['uid'] ?? '',
       postText: snapshotData['postText'] ?? '',
-      postUrl: snapshotData['postUrl'] ?? '',
+      postUrls: images,
       profImage: snapshotData['profImage'] ?? '',
       datePublished:
           parseDateField(snapshotData['datePublished']) ?? DateTime.now(),
