@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:social_media_admin/utils/utils.dart';
 import 'package:uuid/uuid.dart';
 
 class StorageMethods {
@@ -90,7 +91,8 @@ class StorageMethods {
     try {
       // Validate the URL format
       if (!imageUrl.startsWith('gs://') && !imageUrl.startsWith('http')) {
-        throw 'URL ảnh không hợp lệ: $imageUrl';
+         avoidPrint('URL ảnh không hợp lệ: $imageUrl');
+        return;
       }
       
       //get a reference 
@@ -99,7 +101,20 @@ class StorageMethods {
     } on FirebaseException catch (e) {
       throw 'Lỗi tải lên: ${e.message ?? e.code}';
     } catch (e) {
-      throw 'Lỗi không xác định khi tải ảnh: $e';
+      avoidPrint('Lỗi xoá ảnh cũ: $e');
+    }
+  }
+
+  // Delete multiple images from storage
+  Future<void> deleteMultipleImagesFromStorage(List<String> imageUrls) async {
+    try {
+      List<Future<void>> deleteTasks = imageUrls.map((url) {
+        return deleteImageFromStorage(url);
+      }).toList();
+
+      await Future.wait(deleteTasks);
+    } catch (e) {
+      avoidPrint('Lỗi khi xoá nhiều ảnh: $e');
     }
   }
 
