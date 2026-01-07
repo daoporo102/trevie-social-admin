@@ -67,6 +67,24 @@ class StorageMethods {
     }
   }
 
+  // Upload multiple images to storage
+  Future<List<String>> uploadMultipleImages(
+    String childName,
+    List<Uint8List> files,
+    bool isPost,
+  ) async {
+    List<String> downloadUrls = [];
+    try {
+      for (var file in files) {
+        String url = await uploadImageToStorage(childName, file, isPost);
+        downloadUrls.add(url);
+      }
+      return downloadUrls;
+    } catch (e) {
+      throw 'Lỗi khi tải lên nhiều ảnh: $e';
+    }
+  }
+
   //Delete post's image in storage
   Future<void> deleteImageFromStorage(String imageUrl) async {
     try {
