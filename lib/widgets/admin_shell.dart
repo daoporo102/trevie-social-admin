@@ -189,12 +189,12 @@ class _AdminShellState extends State<AdminShell> {
                   route: '/comments',
                   isCollapsed: isActuallyCollapsed,
                 ),
-                _buildMenuItem(
-                  icon: Icons.report,
-                  title: 'Báo Cáo',
-                  route: '/reports',
-                  isCollapsed: isActuallyCollapsed,
-                ),
+                // _buildMenuItem(
+                //   icon: Icons.report,
+                //   title: 'Báo Cáo',
+                //   route: '/reports',
+                //   isCollapsed: isActuallyCollapsed,
+                // ),
                 _buildMenuItem(
                   icon: Icons.report,
                   title: 'Vi phạm',

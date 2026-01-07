@@ -24,11 +24,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _totalPosts = 0;
   int _totalComments = 0;
   int _newUsersToday = 0;
+  int _totalViolations = 0;
 
   // Chart data
   Map<DateTime, int> _userGrowthData = {};
   Map<DateTime, int> _postActivityData = {};
   List<Map<String, dynamic>> _mostActiveUsers = [];
+  Map<DateTime, int> _violationActivityData = {};
 
   // Loading states
   bool _isLoadingStats = true;
@@ -37,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Time period selections
   TimePeriod _userGrowthPeriod = TimePeriod.week;
   TimePeriod _postActivityPeriod = TimePeriod.week;
+  TimePeriod _violationActivityPeriod = TimePeriod.week;
 
   @override
   void initState() {
@@ -81,18 +84,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     final results = await Future.wait([
-      _dashboardService.getTotalUsersCount(),
-      _dashboardService.getTotalPostsCount(),
-      _dashboardService.getTotalCommentsCount(),
+      _dashboardService.getCounters(),
       _dashboardService.getNewUsersToday(),
     ]);
 
     if (!mounted) return;
+
+    final counters = results[0] as Map<String, int>;
+
     setState(() {
-      _totalUsers = results[0];
-      _totalPosts = results[1];
-      _totalComments = results[2];
-      _newUsersToday = results[3];
+      _totalUsers = counters['totalUsers'] ?? 0;
+      _totalPosts = counters['totalPosts'] ?? 0;
+      _totalComments = counters['totalComments'] ?? 0;
+      _totalViolations = counters['totalViolations'] ?? 0;
+      _newUsersToday = results[1] as int;
       _isLoadingStats = false;
     });
 
@@ -110,6 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final chartResults = await Future.wait([
       _dashboardService.getUserGrowthData(period: _userGrowthPeriod),
       _dashboardService.getPostActivityData(period: _postActivityPeriod),
+      _dashboardService.getViolationActivityData(period: _violationActivityPeriod), // ✅ NEW
       _dashboardService.getMostActiveUsers(),
     ]);
 
@@ -118,7 +124,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _userGrowthData = chartResults[0] as Map<DateTime, int>;
       _postActivityData = chartResults[1] as Map<DateTime, int>;
-      _mostActiveUsers = chartResults[2] as List<Map<String, dynamic>>;
+      _violationActivityData = chartResults[2] as Map<DateTime, int>;
+      _mostActiveUsers = chartResults[3] as List<Map<String, dynamic>>;
+      _isLoadingCharts = false;
+    });
+  }
+
+  // Handle violation period change
+  Future<void> _onViolationActivityPeriodChanged(TimePeriod period) async {
+    if (!mounted) return;
+    setState(() {
+      _violationActivityPeriod = period;
+      _isLoadingCharts = true;
+    });
+
+    final data = await _dashboardService.getViolationActivityData(period: period);
+
+    if (!mounted) return;
+    setState(() {
+      _violationActivityData = data;
       _isLoadingCharts = false;
     });
   }
@@ -200,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final crossAxisCount = constraints.maxWidth > 1200
-                      ? 4
+                      ? 5
                       : constraints.maxWidth > 800
                       ? 3
                       : 2;
@@ -234,6 +258,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isLoading: _isLoadingStats,
                       ),
                       StatCard(
+                        title: 'Tổng số vi phạm',
+                        value: _totalViolations.toString(),
+                        icon: Icons.warning,
+                        iconColor: errorBackgroundColor,
+                        isLoading: _isLoadingStats,
+                      ),
+                      StatCard(
                         title: 'Người dùng mới hôm nay',
                         value: _newUsersToday.toString(),
                         icon: Icons.person_add,
@@ -262,6 +293,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   lineColor: infoBackgroundColor,
                   currentPeriod: _postActivityPeriod, // Add this
                   onPeriodChanged: _onPostActivityPeriodChanged,
+                ),
+                const SizedBox(height: 24.0),
+
+                // Violation activity chart
+                LineChartWidget(
+                  title: 'Vi phạm phát hiện',
+                  data: _violationActivityData,
+                  lineColor: errorBackgroundColor,
+                  currentPeriod: _violationActivityPeriod,
+                  onPeriodChanged: _onViolationActivityPeriodChanged,
                 ),
                 const SizedBox(height: 24.0),
 
