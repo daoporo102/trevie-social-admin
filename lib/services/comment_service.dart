@@ -7,6 +7,11 @@ enum CommentSortField { datePublished, name }
 class CommentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Cache for post data (5 minutes TTL)
+  static final Map<String, Map<String, dynamic>> _postCache = {};
+  static DateTime? _lastCacheReset;
+  static const _cacheTTL = Duration(minutes: 5);
+
   // Get all comments from all posts with pagination and filters
   Future<Map<String, dynamic>> getAllComments({
     int limit = 50,
@@ -20,21 +25,37 @@ class CommentService {
     bool ascending = false,
   }) async {
     try {
-      // Get all posts first
-      QuerySnapshot postsSnapshot = await _firestore.collection('posts').get();
+      // Reset cache if expired
+      if (_lastCacheReset == null ||
+          DateTime.now().difference(_lastCacheReset!) > _cacheTTL) {
+        _postCache.clear();
+        _lastCacheReset = DateTime.now();
+      }
+
+      // Batch fetch posts (once per cache period)
+      if (_postCache.isEmpty) {
+        // Get all posts and cache them
+        QuerySnapshot postsSnapshot = await _firestore
+            .collection('posts')
+            .get();
+        for (var doc in postsSnapshot.docs) {
+          _postCache[doc.id] = doc.data() as Map<String, dynamic>;
+        }
+        avoidPrint('Cached ${_postCache.length} posts');
+      }
 
       List<Map<String, dynamic>> allComments = [];
 
       // Fetch comments from each post
-      for (var postDoc in postsSnapshot.docs) {
-        final postData = postDoc.data() as Map<String, dynamic>;
+      for (var entry in _postCache.entries) {
+        final postId = entry.key;
+        final postData = entry.value;
 
-        // Skip this post if postId filter is applied and doesn't match
-        if (postId != null && postId.isNotEmpty && postDoc.id != postId) {
-          continue;
-        }
-
-        Query commentsQuery = postDoc.reference.collection('comments');
+        // Build query for comments
+        Query commentsQuery = _firestore
+            .collection('posts')
+            .doc(postId)
+            .collection('comments');
 
         // Apply date range filters
         if (startDate != null) {
@@ -83,9 +104,11 @@ class CommentService {
 
           allComments.add({
             'comment': Comment.fromSnap(commentDoc),
-            'postId': postDoc.id,
+            'postId': postId,
             'postText': postData['postText'] ?? '',
             'postAuthor': postData['displayName'] ?? '',
+            'name': commentData['name'] ?? '',
+            'profilePic': commentData['profilePic'] ?? '',
           });
         }
       }
